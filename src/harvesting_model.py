@@ -1,11 +1,11 @@
 """
-Energy Harvesting Model for Wireless Sensor Networks.
+Energy harvesting models for WSN simulation.
 
-Implements configurable recharge profiles:
-- Constant-rate harvesting (e.g. baseline ambient background recharge)
-- Periodic solar-cycle harvesting (diurnal sinusoidal day/night solar model)
-- Stochastic Poisson-arrival harvesting (discrete random energy quanta arrivals)
-- Heterogeneous spatial harvesting (different profiles per node or region)
+Supports:
+- Constant background recharge
+- Solar day/night periodic recharge
+- Stochastic Poisson packet arrivals
+- Heterogeneous profiles for individual nodes
 """
 
 import math
@@ -15,37 +15,16 @@ from typing import Dict, Optional, Union, List
 
 
 class HarvestingProfile(ABC):
-    """Abstract base class for energy harvesting models."""
+    """Base class for energy harvesting sources."""
 
     @abstractmethod
     def sample_harvest(self, node_id: int, current_time: int, duration: float = 1.0) -> float:
-        """
-        Sample the actual energy harvested by a node during the time interval.
-
-        Args:
-            node_id: Unique identifier of the sensor node
-            current_time: Current simulation round or timestamp
-            duration: Duration of interval (default 1.0 round)
-
-        Returns:
-            Energy harvested in Joules (>= 0.0)
-        """
+        """Sample energy harvested (in Joules) by node during the time step."""
         pass
 
     @abstractmethod
     def expected_harvest(self, node_id: int, start_time: int, end_time: int) -> float:
-        """
-        Compute expected (mathematical expectation) energy harvested between start_time and end_time.
-        Used by the predictive time-augmented DP and harvesting-aware clustering.
-
-        Args:
-            node_id: Unique identifier of the sensor node
-            start_time: Start round
-            end_time: Target future round (end_time >= start_time)
-
-        Returns:
-            Expected energy in Joules (>= 0.0)
-        """
+        """Expected energy harvested between start_time and end_time."""
         pass
 
     def project_energy(
@@ -56,20 +35,7 @@ class HarvestingProfile(ABC):
         target_time: int,
         battery_capacity: float = 2.0
     ) -> float:
-        """
-        Predict residual energy of a node at target_time factoring in expected harvest
-        and battery capacity clipping.
-
-        Args:
-            node_id: Unique identifier of sensor node
-            current_energy: Current residual energy in Joules
-            current_time: Current round
-            target_time: Future round to evaluate
-            battery_capacity: Max battery storage capacity (Joules)
-
-        Returns:
-            Projected energy in Joules bounded by [0.0, battery_capacity]
-        """
+        """Estimate future battery level after harvesting up to battery capacity."""
         if target_time <= current_time:
             return max(0.0, min(battery_capacity, current_energy))
 
@@ -79,16 +45,9 @@ class HarvestingProfile(ABC):
 
 
 class ConstantHarvesting(HarvestingProfile):
-    """
-    Constant rate energy harvesting model.
-    Models continuous ambient harvesting (e.g. constant thermal or steady RF energy).
-    """
+    """Constant rate energy harvesting (e.g. steady RF or thermal gradient)."""
 
     def __init__(self, rate: float = 0.01):
-        """
-        Args:
-            rate: Constant energy harvested per round in Joules
-        """
         self.rate = max(0.0, rate)
 
     def sample_harvest(self, node_id: int, current_time: int, duration: float = 1.0) -> float:
@@ -104,10 +63,7 @@ class ConstantHarvesting(HarvestingProfile):
 
 
 class SolarPeriodicHarvesting(HarvestingProfile):
-    """
-    Periodic solar-cycle harvesting model.
-    Models diurnal solar cycle: sinusoidal irradiance during daytime hours, zero at night.
-    """
+    """Day/night solar harvesting using a sinusoidal curve during daylight hours."""
 
     def __init__(
         self,
@@ -117,14 +73,6 @@ class SolarPeriodicHarvesting(HarvestingProfile):
         solar_noise: float = 0.0,
         seed: Optional[int] = None
     ):
-        """
-        Args:
-            peak_rate: Maximum energy harvested at solar noon (Joules/round)
-            period: Number of rounds per diurnal cycle (e.g. 24 rounds = 24 hours)
-            day_fraction: Fraction of cycle with sunlight (e.g. 0.5 = 12h day, 12h night)
-            solar_noise: Standard deviation of fractional cloud variation (0.0 = deterministic)
-            seed: Random seed for stochastic cloud variations
-        """
         self.peak_rate = max(0.0, peak_rate)
         self.period = max(1, period)
         self.day_fraction = max(0.01, min(0.99, day_fraction))
@@ -133,10 +81,9 @@ class SolarPeriodicHarvesting(HarvestingProfile):
         self._rng = random.Random(seed) if seed is not None else random.Random()
 
     def _instantaneous_rate(self, t: float) -> float:
-        """Calculate solar rate at continuous time t."""
         t_mod = t % self.period
         if t_mod < self.day_length:
-            # Daytime: half-sine wave over [0, day_length]
+            # Daytime: half-sine wave
             theta = math.pi * (t_mod / self.day_length)
             return self.peak_rate * math.sin(theta)
         return 0.0
@@ -154,7 +101,6 @@ class SolarPeriodicHarvesting(HarvestingProfile):
         if end_time <= start_time:
             return 0.0
         total = 0.0
-        # Integrate round by round
         for t in range(start_time, end_time):
             total += self._instantaneous_rate(t)
         return total
@@ -164,11 +110,7 @@ class SolarPeriodicHarvesting(HarvestingProfile):
 
 
 class StochasticHarvesting(HarvestingProfile):
-    """
-    Stochastic energy harvesting model.
-    Models energy arrival as a Poisson process where discrete energy quanta
-    arrive randomly over time (e.g. ambient RF bursts, intermittent vibration/wind, cloud-scattered solar).
-    """
+    """Discrete energy arrivals modeled as a Poisson process."""
 
     def __init__(
         self,
@@ -176,32 +118,24 @@ class StochasticHarvesting(HarvestingProfile):
         quantum: float = 0.015,
         seed: Optional[int] = None
     ):
-        """
-        Args:
-            lambda_rate: Average number of Poisson energy arrivals per round (lambda)
-            quantum: Energy delivered per arrival packet in Joules
-            seed: Random seed for reproducibility
-        """
         self.lambda_rate = max(0.0, lambda_rate)
         self.quantum = max(0.0, quantum)
         self._rng = random.Random(seed) if seed is not None else random.Random()
 
     def _sample_poisson(self, lam: float) -> int:
-        """Sample from Poisson distribution using Knuth's algorithm or Gaussian approximation."""
         if lam <= 0.0:
             return 0
         if lam > 30:
-            # Gaussian approximation for large lambda
             val = int(round(self._rng.gauss(lam, math.sqrt(lam))))
             return max(0, val)
-        # Knuth's algorithm
-        L = math.exp(-lam)
-        k = 0
-        p = 1.0
-        while p > L:
-            k += 1
-            p *= self._rng.random()
-        return k - 1
+        # Knuth's Poisson sampling
+        limit = math.exp(-lam)
+        count = 0
+        prob = 1.0
+        while prob > limit:
+            count += 1
+            prob *= self._rng.random()
+        return count - 1
 
     def sample_harvest(self, node_id: int, current_time: int, duration: float = 1.0) -> float:
         arrivals = self._sample_poisson(self.lambda_rate * duration)
@@ -219,10 +153,7 @@ class StochasticHarvesting(HarvestingProfile):
 
 
 class HeterogeneousHarvesting(HarvestingProfile):
-    """
-    Spatial/Heterogeneous harvesting model.
-    Maps distinct harvesting profiles to specific nodes or node groups.
-    """
+    """Allows assigning different harvesting profiles to different nodes."""
 
     def __init__(
         self,
@@ -252,16 +183,7 @@ def create_harvesting_model(
     model_type: str = 'solar',
     **kwargs
 ) -> HarvestingProfile:
-    """
-    Factory function to instantiate harvesting profiles.
-
-    Args:
-        model_type: One of 'constant', 'solar', 'stochastic', 'heterogeneous', 'none'
-        **kwargs: Arguments passed to specific profile constructor
-
-    Returns:
-        HarvestingProfile instance
-    """
+    """Helper to instantiate harvesting profile by name."""
     model_type = model_type.lower()
     if model_type in ('none', 'zero', 'off'):
         return ConstantHarvesting(rate=0.0)

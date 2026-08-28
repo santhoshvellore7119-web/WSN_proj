@@ -1,6 +1,8 @@
 """
 Clustering module for WSN simulation.
-Implements LEACH-style clustering with energy-aware and harvesting-aware head selection.
+
+Implements LEACH-style clustering with energy-weighted cluster head selection,
+with support for projected energy harvesting when forming clusters.
 """
 
 import heapq
@@ -25,35 +27,12 @@ def leach_clustering(
     lookahead_rounds: int = 1
 ) -> Tuple[Dict[int, int], List[int]]:
     """
-    Perform LEACH-style clustering for one round with optional energy-harvesting awareness.
-
-    Harvesting-Aware Rotation Rule:
-    -------------------------------
-    Standard LEACH computes CH probability based on static instantaneous residual energy E_i.
-    In energy-harvesting networks, a node currently depleted may receive substantial recharge
-    during its cluster-head tenure, whereas a high-energy node in shade will only drain.
-    We compute projected effective energy:
-        E_eff[i] = project_energy(node_i, E_curr[i], current_time, current_time + lookahead_rounds)
-    Probability for node i:
-        P_i = min(1.0, (desired_num_ch * E_eff[i]) / sum(E_eff))
-
-    Min-heap tiebreaker ranks candidates by (-E_eff[i], rand_val), selecting nodes
-    with highest projected energy stability.
-
-    Args:
-        nodes: Dictionary of node_id -> Node object (only alive nodes considered)
-        energy_model: EnergyModel instance
-        desired_clusters_ratio: Desired fraction of nodes to become cluster heads (default 0.05 = 5%)
-        threshold_multiplier: Multiplier for threshold adjustment
-        harvesting_model: HarvestingProfile instance (if provided, uses projected energy)
-        current_time: Current simulation round
-        lookahead_rounds: Number of rounds to project energy forward (default 1)
-
-    Returns:
-        cluster_assignment: dict mapping node_id -> cluster_head_id
-        cluster_heads: list of node IDs that are cluster heads
+    Elects cluster heads for the current round and assigns member nodes
+    to the nearest cluster head.
+    
+    If a harvesting model is provided, election probabilities are weighted
+    by the projected energy over the upcoming round.
     """
-    # Get alive nodes
     alive_nodes = {nid: node for nid, node in nodes.items() if node.is_alive}
     if not alive_nodes:
         return {}, []
@@ -61,12 +40,12 @@ def leach_clustering(
     num_alive = len(alive_nodes)
     desired_num_ch = max(1, int(num_alive * desired_clusters_ratio))
 
-    # Reset roles and cluster IDs for alive nodes
+    # Reset roles for this round
     for node in alive_nodes.values():
         node.role = 'member'
         node.cluster_id = -1
 
-    # Step 1: Compute effective energy (projected harvest or current residual)
+    # 1. Compute effective energy (projected harvest or current battery)
     effective_energies: Dict[int, float] = {}
     for nid, node in alive_nodes.items():
         if harvesting_model is not None:
@@ -85,39 +64,41 @@ def leach_clustering(
     if total_effective_energy <= 0.0:
         return {}, []
 
-    # Step 2: Probability weighted by effective/projected energy
+    # 2. Probability weighted by effective energy
     node_probabilities = {}
     for nid, eff_e in effective_energies.items():
         prob = (desired_num_ch * eff_e * threshold_multiplier) / total_effective_energy
         node_probabilities[nid] = min(prob, 1.0)
 
-    # Step 3: Candidate selection via min-heap prioritizing higher projected energy
+    # 3. Candidate selection with min-heap tiebreaker
     candidates = []
     for nid, prob in node_probabilities.items():
         rand_val = random.random()
         if rand_val < prob:
-            # Min-heap key: (random_val, -effective_energy, node_id)
             heapq.heappush(candidates, (rand_val, -effective_energies[nid], nid))
 
-    # Step 4: Select up to desired_num_ch cluster heads
+    # 4. Pick up to desired number of cluster heads
     selected_ch = []
     while candidates and len(selected_ch) < desired_num_ch:
         _, _, nid = heapq.heappop(candidates)
         selected_ch.append(nid)
         alive_nodes[nid].role = 'CH'
 
-    # If fewer candidates than desired, fill from remaining alive nodes sorted by effective energy
+    # Fallback if fewer candidates were elected
     if len(selected_ch) < desired_num_ch:
-        remaining = [(effective_energies[nid], nid) for nid, node in alive_nodes.items()
-                     if node.role == 'member']
+        remaining = [
+            (effective_energies[nid], nid)
+            for nid, node in alive_nodes.items()
+            if node.role == 'member'
+        ]
         remaining.sort(reverse=True)
-        for energy, nid in remaining:
+        for _, nid in remaining:
             if len(selected_ch) >= desired_num_ch:
                 break
             selected_ch.append(nid)
             alive_nodes[nid].role = 'CH'
 
-    # Step 5: Assign each member node to nearest cluster head
+    # 5. Assign member nodes to closest CH
     cluster_assignment = {}
     for nid, node in alive_nodes.items():
         if node.role == 'CH':
@@ -146,9 +127,7 @@ def simulate_clustering_round(
     current_time: int = 0,
     lookahead_rounds: int = 1
 ) -> Tuple[Dict[int, int], List[int], Dict[int, float]]:
-    """
-    Simulate one round of clustering and return additional info for debugging.
-    """
+    """Runs a single round of clustering and returns cluster stats."""
     alive_count = sum(1 for node in nodes.values() if node.is_alive)
     if alive_count == 0:
         return {}, [], {"alive_nodes": 0}

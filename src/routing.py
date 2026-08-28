@@ -1,10 +1,11 @@
 """
 Routing module for WSN simulation.
+
 Implements:
-1. Dijkstra's Algorithm (energy-weighted minimum cost paths)
-2. A* Algorithm (admissible Euclidean-energy heuristic)
-3. Disjoint-Set Union (Union-Find) data structure with path compression and rank optimization
-4. Rip-Up-and-Reroute live detour fallback engine for fast O(deg(u) * alpha(V)) fault recovery
+- Dijkstra's algorithm for minimum-energy paths
+- A* search using Euclidean distance heuristic
+- Union-Find (DSU) for network connectivity tracking
+- Live detour rerouting when an intermediate node runs out of energy
 """
 
 import heapq
@@ -16,10 +17,7 @@ from energy_model import EnergyModel
 
 
 class UnionFind:
-    """
-    Disjoint-Set Forest (DSU) with Path Compression and Union by Rank.
-    Supports near constant-time O(alpha(V)) connectivity queries.
-    """
+    """Disjoint-Set data structure with path compression and union by rank."""
 
     def __init__(self, elements: Optional[Iterable[int]] = None):
         self.parent: Dict[int, int] = {}
@@ -80,8 +78,7 @@ def dijkstra(
     transmission_range: Optional[float] = None
 ) -> Tuple[Optional[List[int]], float]:
     """
-    Dijkstra's algorithm to find the shortest energy-weighted path from start node to the base station.
-    The base station is treated as a virtual node with ID -1.
+    Finds the lowest-energy path from start node to the base station (-1) using Dijkstra's algorithm.
     """
     if start not in alive_nodes:
         return None, float('inf')
@@ -112,6 +109,7 @@ def dijkstra(
                             continue
                     neighbors.append((v, weight))
 
+        # Check edge to base station (-1)
         if u in alive_nodes:
             u_node = nodes[u]
             dist_to_bs = math.sqrt((u_node.x - base_station_pos[0])**2 + (u_node.y - base_station_pos[1])**2)
@@ -154,8 +152,7 @@ def astar(
     transmission_range: Optional[float] = None
 ) -> Tuple[Optional[List[int]], float, int]:
     """
-    A* algorithm to find the shortest path from start node to the base station.
-    Uses heuristic: h(n) = k * E_elec + k * E_fs * (distance_to_BS)^2 (admissible).
+    A* search to base station using estimated distance-based transmission energy as heuristic.
     """
     if start not in alive_nodes:
         return None, float('inf'), 0
@@ -246,41 +243,15 @@ def rip_up_and_reroute(
     k: int = 1
 ) -> Tuple[Optional[List[int]], float]:
     """
-    Novel Rip-Up-and-Reroute Engine using Union-Find (DSU) Connectivity Maintenance.
-
-    Algorithmic Workflow:
-    ---------------------
-    1. Detects failed/shortfall node in active_path: [u_0, ..., u_prev, failed_node, ..., -1].
-    2. Rips up severed edge (u_prev -> failed_node).
-    3. Builds a disjoint-set representation of active connectivity in O(V * alpha(V)) excluding failed_node.
-    4. Evaluates all neighbors v in nbr(u_prev) such that Find(v) == Find(-1) (connected to Base Station).
-    5. Computes a localized detour from u_prev through the most energy-viable neighbor v*,
-       splicing the new segment without a full O(|E|*H*T) graph rebuild.
-    6. Recovery Time Complexity: O(V * alpha(V) + deg(u_prev)) ~ O(V).
-
-    Args:
-        nodes: dictionary of node_id -> Node
-        adj_list: adjacency list of the graph
-        failed_node_id: ID of the node that depleted/failed
-        active_path: currently planned path
-        base_station_pos: (x, y) coordinates of base station
-        energy_model: EnergyModel instance
-        alive_nodes: set of active/alive node IDs
-        harvesting_model: optional HarvestingProfile instance
-        current_time: current simulation round
-        transmission_range: optional max transmission distance
-        k: packet size in bits
-
-    Returns:
-        new_path: spliced route [u_0, ..., u_prev, v*, ..., -1] or None
-        cost: total transmission energy cost of new path
+    Reroutes an active path around a failed intermediate node using Union-Find
+    to quickly check which neighbors can still reach the base station.
     """
     if not active_path or failed_node_id not in active_path:
         return active_path, 0.0
 
     fail_idx = active_path.index(failed_node_id)
     if fail_idx == 0:
-        # Cluster head itself failed
+        # Cluster head itself ran out of battery
         return None, float('inf')
 
     u_prev = active_path[fail_idx - 1]
@@ -292,17 +263,17 @@ def rip_up_and_reroute(
     if u_prev not in viable_nodes:
         return None, float('inf')
 
-    # 1. Build Union-Find disjoint sets of active graph
+    # Build Union-Find sets for connected components
     uf = UnionFind(viable_nodes | {-1})
 
     for u in viable_nodes:
-        # Check connection to base station
+        # Base station reachability
         u_node = nodes[u]
         dist_bs = math.sqrt((u_node.x - base_station_pos[0])**2 + (u_node.y - base_station_pos[1])**2)
         if transmission_range is None or dist_bs <= transmission_range:
             uf.union(u, -1)
 
-        # Check connections to viable sensor neighbors
+        # Neighbor reachability
         if u in adj_list:
             for v, _ in adj_list[u]:
                 if v in viable_nodes:
@@ -314,17 +285,17 @@ def rip_up_and_reroute(
 
     bs_root = uf.find(-1)
 
-    # 2. Check if u_prev can reach BS directly or via an alternate neighbor
+    # Check candidates for local detour from u_prev
     candidates: List[Tuple[float, int, List[int]]] = []
 
-    # Option A: u_prev direct to BS if reachable
+    # Option 1: Send directly from u_prev to BS if in range
     u_prev_node = nodes[u_prev]
     dist_direct_bs = math.sqrt((u_prev_node.x - base_station_pos[0])**2 + (u_prev_node.y - base_station_pos[1])**2)
     if transmission_range is None or dist_direct_bs <= transmission_range:
         cost_direct = energy_model.transmit_energy(k, dist_direct_bs)
         candidates.append((cost_direct, -1, [-1]))
 
-    # Option B: Alternate neighbors of u_prev in the BS connected component
+    # Option 2: Alternate neighbors of u_prev connected to BS
     if u_prev in adj_list:
         for v, _ in adj_list[u_prev]:
             if v in viable_nodes and v != failed_node_id and uf.find(v) == bs_root:
@@ -332,7 +303,7 @@ def rip_up_and_reroute(
                 if transmission_range is not None and dist_uv > transmission_range:
                     continue
                 cost_uv = energy_model.transmit_energy(k, dist_uv)
-                # Find shortest path from v to BS in viable subgraph
+                # Shortest path from neighbor v to BS
                 sub_path, sub_cost = dijkstra(
                     nodes, adj_list, start=v, base_station_pos=base_station_pos,
                     energy_model=energy_model, alive_nodes=viable_nodes, k=k,
@@ -345,15 +316,15 @@ def rip_up_and_reroute(
     if not candidates:
         return None, float('inf')
 
-    # Select candidate with minimal detour energy cost (and highest residual energy as tiebreaker)
+    # Sort by lowest energy cost, tie-break by residual energy
     candidates.sort(key=lambda item: (item[0], -nodes[item[1]].residual_energy if item[1] != -1 else 0.0))
     best_cost, best_target, best_subpath = candidates[0]
 
-    # 3. Splice path: prefix up to u_prev + detour subpath to BS
-    prefix = active_path[:fail_idx]  # contains [u_0, ..., u_prev]
+    # Splice detour into active path
+    prefix = active_path[:fail_idx]
     new_path = prefix + best_subpath
 
-    # Calculate total energy cost of new path
+    # Calculate total energy cost
     total_cost = 0.0
     for i in range(len(new_path) - 1):
         src_id = new_path[i]
@@ -377,19 +348,23 @@ def compute_routes_for_cluster_heads(
     algorithm: str = 'dijkstra',
     transmission_range: Optional[float] = None
 ) -> Dict[int, Tuple[Optional[List[int]], float]]:
-    """
-    Compute routes from each cluster head to the base station.
-    """
+    """Computes routing paths from each cluster head to the base station."""
     routes = {}
     for ch in cluster_heads:
         if ch not in alive_nodes:
             routes[ch] = (None, float('inf'))
             continue
         if algorithm == 'dijkstra':
-            path, cost = dijkstra(nodes, graph.adjacency_list, ch, base_station_pos, energy_model, alive_nodes, transmission_range=transmission_range)
+            path, cost = dijkstra(
+                nodes, graph.adjacency_list, ch, base_station_pos, energy_model,
+                alive_nodes, transmission_range=transmission_range
+            )
             routes[ch] = (path, cost)
         elif algorithm == 'astar':
-            path, cost, _ = astar(nodes, graph.adjacency_list, ch, base_station_pos, energy_model, alive_nodes, transmission_range=transmission_range)
+            path, cost, _ = astar(
+                nodes, graph.adjacency_list, ch, base_station_pos, energy_model,
+                alive_nodes, transmission_range=transmission_range
+            )
             routes[ch] = (path, cost)
         else:
             raise ValueError("Algorithm must be 'dijkstra' or 'astar'")
@@ -404,7 +379,7 @@ def compare_dijkstra_astar(
     base_station_pos: Tuple[float, float],
     alive_nodes: Set[int]
 ) -> Dict[str, Dict]:
-    """Compare Dijkstra and A* on the same set of cluster heads."""
+    """Runs both Dijkstra and A* to compare execution time and node expansions."""
     results = {'dijkstra': {}, 'astar': {}, 'comparison': {}}
 
     start_time = time.time()

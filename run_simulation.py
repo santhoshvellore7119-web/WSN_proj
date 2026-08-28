@@ -1,5 +1,5 @@
 """
-Run simulation and generate visualizations with energy harvesting and adaptive routing.
+Example script to run a single simulation with solar harvesting and plot results.
 """
 import sys
 sys.path.append('src')
@@ -9,10 +9,9 @@ from visualize import Visualizer
 
 
 def main():
-    print("Running WSN Energy-Harvesting Adaptive Routing Simulation")
-    print("=" * 60)
+    print("Running WSN Energy-Harvesting Simulation (Solar + Time-Augmented DP)")
+    print("-" * 65)
 
-    # Create simulator with solar harvesting and time-augmented DP enabled
     sim = Simulator(
         num_nodes=50,
         area_width=100.0,
@@ -30,11 +29,9 @@ def main():
         routing_algorithm='dijkstra'
     )
 
-    # Run simulation
     sim.run(max_rounds=200)
 
-    # Generate visualizations
-    print("\nGenerating visualizations...")
+    print("\nGenerating output plots...")
     viz = Visualizer(sim)
     viz.plot_network_lifetime()
     viz.plot_energy_heatmap_over_time(save=True, filename='energy_heatmap.png')
@@ -45,8 +42,7 @@ def main():
         for r in rounds_to_plot:
             viz.plot_routing_tree(r, save=True)
 
-    print("Simulation and visualization complete!")
-    print("Check the 'results' directory for output plots and simulation logs.")
+    print("Done! Plots saved to results/ folder.")
 
 
 if __name__ == "__main__":

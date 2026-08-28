@@ -1,10 +1,11 @@
 """
-Visualization module for WSN simulation.
-Generates publication-quality plots:
-1. Network Lifetime curves (Alive nodes & Total energy vs Rounds)
-2. Energy-over-Time 2D Heatmaps (spatiotemporal energy recharge cycles)
-3. Multi-Scenario Comparative Lifetime plots (Baseline vs Harvesting-Unaware vs Harvesting-Aware)
-4. Network Topology & Routing Trees
+Visualization utilities for WSN simulation results.
+
+Plots:
+- Lifetime curves (alive nodes and residual energy over rounds)
+- 2D heatmaps showing per-node energy levels over time
+- Network topology and routing trees
+- Side-by-side comparative lifetime curves
 """
 
 import matplotlib.pyplot as plt
@@ -15,19 +16,15 @@ import math
 
 
 class Visualizer:
-    def __init__(self, simulator=None):
-        """
-        Initialize Visualizer.
+    """Generates plots from a completed simulation run."""
 
-        Args:
-            simulator: Optional Simulator instance after simulation run
-        """
+    def __init__(self, simulator=None):
         self.sim = simulator
         self.results_dir = 'results'
         os.makedirs(self.results_dir, exist_ok=True)
 
     def plot_network_lifetime(self, save: bool = True, filename: str = 'network_lifetime.png'):
-        """Plot alive nodes vs rounds and total residual energy vs rounds."""
+        """Plots alive nodes and total residual energy vs rounds."""
         if self.sim is None or not self.sim.alive_nodes_history:
             print("No simulation data to plot.")
             return
@@ -38,7 +35,7 @@ class Visualizer:
 
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
 
-        # Subplot 1: Alive Nodes
+        # Alive nodes
         ax1.plot(rounds, alive_nodes, 'b-', linewidth=2, label='Alive Nodes')
         ax1.set_xlabel('Round')
         ax1.set_ylabel('Number of Alive Nodes')
@@ -53,8 +50,8 @@ class Visualizer:
                         label=f'HND (Round {self.sim.half_nodes_dead_round})')
         ax1.legend(loc='upper right')
 
-        # Subplot 2: Total Energy
-        ax2.plot(rounds, total_energy, 'm-', linewidth=2, label='Total Residual Energy (J)')
+        # Total energy
+        ax2.plot(rounds, total_energy, 'm-', linewidth=2, label='Total Energy (J)')
         ax2.set_xlabel('Round')
         ax2.set_ylabel('Total Energy (Joules)')
         ax2.set_title('Total Residual Energy vs Rounds')
@@ -76,19 +73,11 @@ class Visualizer:
         filename: str = 'energy_heatmap.png',
         title: Optional[str] = None
     ):
-        """
-        Plot 2D Energy-Over-Time Heatmap matrix:
-        - X-axis: Simulation Rounds (1..R)
-        - Y-axis: Node ID (0..N-1)
-        - Color intensity: Residual Energy in Joules (0.0 to Max Capacity)
-
-        Visualizes periodic solar recharge waves, stochastic arrivals, and hot spots.
-        """
+        """Plots 2D heatmap of per-node residual energy across all rounds."""
         if self.sim is None or not self.sim.energy_matrix:
             print("No energy matrix data available for heatmap.")
             return
 
-        # energy_matrix shape: [rounds x num_nodes] -> Transpose to [num_nodes x rounds]
         matrix = np.array(self.sim.energy_matrix).T
         num_nodes, num_rounds = matrix.shape
         max_val = float(matrix.max()) if matrix.size > 0 and matrix.max() > 0 else self.sim.max_battery_capacity
@@ -107,7 +96,7 @@ class Visualizer:
         cbar = plt.colorbar(im)
         cbar.set_label('Residual Energy (Joules)', rotation=270, labelpad=15)
 
-        default_title = f'Spatiotemporal Energy Distribution over Time ({num_nodes} Nodes, {num_rounds} Rounds)'
+        default_title = f'Node Residual Energy Over Time ({num_nodes} Nodes, {num_rounds} Rounds)'
         plt.title(title or default_title, fontsize=13, fontweight='bold')
         plt.xlabel('Simulation Round', fontsize=11)
         plt.ylabel('Node ID', fontsize=11)
@@ -123,9 +112,7 @@ class Visualizer:
             plt.show()
 
     def plot_routing_tree(self, round_num: int, save: bool = True):
-        """
-        Plot network topology showing node positions, cluster heads, and routes to base station.
-        """
+        """Plots 2D sensor positions, elected cluster heads, and paths to base station."""
         if self.sim is None or round_num < 1 or round_num > len(self.sim.cluster_heads_history):
             return
 
@@ -138,7 +125,6 @@ class Visualizer:
         ys = [node.y for node in self.sim.nodes.values()]
         colors = []
         for nid, node in self.sim.nodes.items():
-            # Check historical alive status at round_num if energy_matrix is available
             if self.sim.energy_matrix and round_num <= len(self.sim.energy_matrix):
                 is_alive_at_round = self.sim.energy_matrix[round_num - 1][nid] > 0.0
             else:
@@ -158,7 +144,7 @@ class Visualizer:
         plt.scatter([bs_x], [bs_y], c='gold', s=250, marker='*', edgecolors='black', linewidth=1.5,
                     label='Base Station', zorder=4)
 
-        # Plot routes from CHs to BS
+        # Routes from cluster heads to base station
         first_route = True
         for ch_id, route_info in routes_dict.items():
             if not route_info:
@@ -180,10 +166,10 @@ class Visualizer:
 
         plt.scatter([], [], c='crimson', s=60, edgecolors='black', label='Cluster Head (CH)')
         plt.scatter([], [], c='dodgerblue', s=60, edgecolors='black', label='Member Node')
-        plt.scatter([], [], c='lightgray', s=60, edgecolors='black', label='Depleted/Dead Node')
+        plt.scatter([], [], c='lightgray', s=60, edgecolors='black', label='Dead Node')
 
         plt.legend(loc='upper right')
-        plt.title(f'WSN Topology & Multi-Hop Routing Paths - Round {round_num}', fontsize=12, fontweight='bold')
+        plt.title(f'WSN Topology & Routing Tree - Round {round_num}', fontsize=12, fontweight='bold')
         plt.xlabel('X Position (m)')
         plt.ylabel('Y Position (m)')
         plt.grid(True, linestyle='--', alpha=0.5)
@@ -199,7 +185,7 @@ class Visualizer:
             plt.show()
 
     def generate_all_plots(self):
-        """Generate standard network lifetime and routing tree figures."""
+        """Generates standard lifetime curves, heatmaps, and routing topology plots."""
         print("Generating network lifetime plot...")
         self.plot_network_lifetime()
         if self.sim and self.sim.energy_matrix:
@@ -219,14 +205,7 @@ def plot_comparison_lifetime(
     save: bool = True,
     filename: str = 'network_lifetime_comparison.png'
 ):
-    """
-    Generate comparative multi-curve figure comparing multiple simulation runs.
-
-    Args:
-        results_dict: Mapping of strategy name -> Simulator instance or dict with metrics
-        save: Save figure to disk
-        filename: Output filename in results/ directory
-    """
+    """Generates comparative alive nodes and energy curves for multiple scenarios."""
     os.makedirs('results', exist_ok=True)
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 9))
 
