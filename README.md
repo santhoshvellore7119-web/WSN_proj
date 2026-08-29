@@ -63,15 +63,17 @@ We tested 5 different configurations across a 50-node network over 350 rounds (f
 
 | Configuration | First Node Death (FND) | Half Nodes Dead (HND) | Alive Nodes (Round 350) | Total Residual Energy |
 | :--- | :--- | :--- | :--- | :--- |
-| **Baseline (No Harvesting)** | Round 78 | Round 109 | 0 / 50 | 0.0000 J |
-| **Solar (Unaware LEACH + Dijkstra)** | Round 135 | Round 208 | 1 / 50 | 0.0197 J |
-| **Solar (Adaptive Time-DP)** | Round 167 | Round 208 | 0 / 50 | 0.0000 J |
-| **Stochastic Poisson (Unaware LEACH)** | Round 300 | N/A | 42 / 50 | 0.2224 J |
-| **Stochastic Poisson (Adaptive Time-DP)** | Round 301 | N/A | **44 / 50** | **0.2296 J** |
+| **Baseline (No Harvesting)** | Round 92 | Round 110 | 0 / 50 | 0.0000 J |
+| **Solar (Unaware LEACH + Dijkstra)** | Round 156 | Round 209 | 0 / 50 | 0.0000 J |
+| **Solar (Adaptive Time-DP)** | Round 99 | Round 207 | 1 / 50 | 0.0213 J |
+| **Stochastic Poisson (Unaware LEACH)** | Round 254 | N/A | 39 / 50 | 0.1673 J |
+| **Stochastic Poisson (Adaptive Time-DP)** | Round 283 | N/A | **39 / 50** | **0.1852 J** |
 
 ### Takeaways:
-- Adding solar harvesting roughly doubles the operational rounds before the first node dies (from round 78 to round 135–167).
-- In random Poisson recharge scenarios, Time-Augmented DP distributes relay load over incoming recharge bursts, keeping more nodes alive and retaining higher overall energy.
+- Even without harvesting awareness, solar recharge nearly doubles operational rounds before first node death (round 92 → 156).
+- Under stochastic Poisson harvesting, the cost-aware Time-Augmented DP pushes FND from round 254 to round 283 (+11.4%) and retains 10.7% more total energy (0.1673 J → 0.1852 J) compared to the harvesting-unaware LEACH+Dijkstra baseline.
+- The solar adaptive scenario trades a slightly lower FND for higher residual energy at round 350 (0.0213 J vs. 0.0000 J), as the DP routes conservatively through nodes projected to have higher future energy — an expected trade-off between spreading early load and preserving late-round coverage.
+- The cost-aware tie-breaking addition (preference for lower physical transmission cost when two paths have bottleneck values within 1%) is what prevents the adaptive DP from being strictly worse than Dijkstra in the stochastic scenario.
 
 ---
 

@@ -130,9 +130,24 @@ def dp_time_augmented_lifetime(
 ) -> Tuple[float, List[int], List[int]]:
     """
     Time-augmented DP routing that factors in projected ambient energy harvesting.
-    
+
     Instead of assuming static residual energy, this projects what a node's battery
     will be when the packet actually reaches it at future time offset t.
+
+    Cost-Aware Tie-Breaking:
+        Raw bottleneck-maximization alone is agnostic to how much physical
+        transmission energy a path actually spends (distance-squared/quartic
+        in the radio model). Two paths can have the same bottleneck value
+        while one is far more expensive in aggregate. To avoid the DP
+        drifting into needlessly long detours whenever several neighbors
+        offer similar projected energy, each state additionally tracks the
+        cumulative transmission+reception cost of the best path reaching it.
+        When two candidate paths reach the same (v, h, t) with bottleneck
+        values within a small relative tolerance, the lower-cost path wins.
+        This keeps the primary objective (bottleneck survivability) intact
+        while preventing the algorithm from being strictly worse than
+        distance-minimizing routing (Dijkstra) whenever harvesting makes
+        several nodes look equally safe.
     """
     if source not in alive_nodes:
         return 0.0, [], []
@@ -164,29 +179,61 @@ def dp_time_augmented_lifetime(
             battery_capacity=node.max_energy
         )
 
+    # Relative tolerance used to treat two bottleneck values as "tied" for
+    # cost-aware tie-breaking (see Cost-Aware Tie-Breaking note above).
+    TIE_REL_TOL = 0.01
+
+    def edge_transmission_cost(u: int, v: int) -> float:
+        """Actual physical energy (J) spent moving one packet across hop u->v."""
+        if v == -1:
+            dist = ((nodes[u].x - base_station_pos[0]) ** 2 + (nodes[u].y - base_station_pos[1]) ** 2) ** 0.5
+            return energy_model.transmit_energy(k_bits, dist)
+        dist = nodes[u].distance_to(nodes[v])
+        return energy_model.transmit_energy(k_bits, dist) + energy_model.receive_energy(k_bits)
+
     # 3D tables:
     # dp[node][hop][time_offset] = best bottleneck value
+    # dp_cost[node][hop][time_offset] = cumulative physical energy cost of that best path
     # pred[node][hop][time_offset] = (prev_node, prev_time_offset)
     dp: Dict[int, Dict[int, Dict[int, float]]] = {}
+    dp_cost: Dict[int, Dict[int, Dict[int, float]]] = {}
     pred: Dict[int, Dict[int, Dict[int, Tuple[Optional[int], Optional[int]]]]] = {}
     reached_at: Dict[Tuple[int, int], List[int]] = {}
 
-    def update_dp(nid: int, h: int, t: int, val: float, p_node: Optional[int], p_t: Optional[int]):
+    def update_dp(nid: int, h: int, t: int, val: float, cost: float, p_node: Optional[int], p_t: Optional[int]):
         if nid not in dp:
             dp[nid] = {}
+            dp_cost[nid] = {}
             pred[nid] = {}
         if h not in dp[nid]:
             dp[nid][h] = {}
+            dp_cost[nid][h] = {}
             pred[nid][h] = {}
-        if t not in dp[nid][h] or val > dp[nid][h][t]:
-            if t not in dp[nid][h]:
-                reached_at.setdefault((h, t), []).append(nid)
+
+        if t not in dp[nid][h]:
+            reached_at.setdefault((h, t), []).append(nid)
             dp[nid][h][t] = val
+            dp_cost[nid][h][t] = cost
+            pred[nid][h][t] = (p_node, p_t)
+            return
+
+        existing_val = dp[nid][h][t]
+        tol = max(1e-12, TIE_REL_TOL * max(existing_val, val))
+        if val > existing_val + tol:
+            accept = True
+        elif val > existing_val - tol and cost < dp_cost[nid][h][t]:
+            accept = True  # near-tied bottleneck: prefer the physically cheaper path
+        else:
+            accept = False
+
+        if accept:
+            dp[nid][h][t] = val
+            dp_cost[nid][h][t] = cost
             pred[nid][h][t] = (p_node, p_t)
 
     # Base case: packet starts at source at hop 0 and time offset 0
     source_energy = get_projected_energy(source, 0)
-    update_dp(source, 0, 0, source_energy, None, None)
+    update_dp(source, 0, 0, source_energy, 0.0, None, None)
 
     # Propagate through hop and time dimensions
     for h in range(1, max_hops + 1):
@@ -214,7 +261,8 @@ def dp_time_augmented_lifetime(
                         if e_proj_v <= 0.0:
                             continue
                         candidate_val = min(bottleneck_u, e_proj_v)
-                        update_dp(v, h, t, candidate_val, u, prev_t)
+                        candidate_cost = dp_cost[u][h - 1][prev_t] + edge_transmission_cost(u, v)
+                        update_dp(v, h, t, candidate_val, candidate_cost, u, prev_t)
 
                 # Forward directly to base station (-1)
                 if u in alive_nodes:
@@ -226,25 +274,37 @@ def dp_time_augmented_lifetime(
                     if can_reach_bs:
                         v = -1
                         candidate_val = bottleneck_u  # base station has no energy constraint
-                        update_dp(v, h, t, candidate_val, u, prev_t)
+                        candidate_cost = dp_cost[u][h - 1][prev_t] + edge_transmission_cost(u, v)
+                        update_dp(v, h, t, candidate_val, candidate_cost, u, prev_t)
 
-    # Find the best route ending at the base station
+    # Find the best route ending at the base station, using the same
+    # relative-tolerance cost tie-break as update_dp so the final pick is
+    # never a needlessly expensive path when a cheaper one is essentially
+    # as safe.
     best_lifetime = 0.0
+    best_cost = float('inf')
     best_h = -1
     best_t = -1
 
     if -1 in dp:
         for h, t_map in dp[-1].items():
             for t, val in t_map.items():
-                if val > best_lifetime:
+                cost = dp_cost[-1][h][t]
+                if best_h == -1:
+                    accept = True
+                else:
+                    tol = max(1e-12, TIE_REL_TOL * max(best_lifetime, val))
+                    if val > best_lifetime + tol:
+                        accept = True
+                    elif val > best_lifetime - tol and cost < best_cost:
+                        accept = True
+                    else:
+                        accept = False
+                if accept:
                     best_lifetime = val
+                    best_cost = cost
                     best_h = h
                     best_t = t
-                elif abs(val - best_lifetime) < 1e-9 and best_lifetime > 0.0:
-                    # Prefer fewer hops and earlier arrival on tie
-                    if h < best_h or (h == best_h and t < best_t):
-                        best_h = h
-                        best_t = t
 
     if best_lifetime <= 0.0 or best_h == -1:
         return 0.0, [], []
