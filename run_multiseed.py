@@ -64,6 +64,13 @@ CONFIGS = {
         harvesting_profile='solar',
         harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5},
         enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False,
+        routing_algorithm='dijkstra'
+    ),
+    'Solar - Energy-Aware': dict(
+        harvesting_profile='solar',
+        harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5},
+        enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False,
+        routing_algorithm='energy_dijkstra'
     ),
     'Solar - Adaptive (Time-DP)': dict(
         harvesting_profile='solar',
@@ -71,10 +78,29 @@ CONFIGS = {
         enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True,
         max_dp_hops=5,
     ),
+    'Shadowed - Unaware': dict(
+        harvesting_profile='shadowed',
+        harvesting_kwargs={'peak_rate': 0.0012, 'shadow_fraction': 0.5, 'shadow_penalty': 0.1},
+        enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False,
+        routing_algorithm='dijkstra'
+    ),
+    'Shadowed - Energy-Aware': dict(
+        harvesting_profile='shadowed',
+        harvesting_kwargs={'peak_rate': 0.0012, 'shadow_fraction': 0.5, 'shadow_penalty': 0.1},
+        enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False,
+        routing_algorithm='energy_dijkstra'
+    ),
+    'Shadowed - Adaptive (Time-DP)': dict(
+        harvesting_profile='shadowed',
+        harvesting_kwargs={'peak_rate': 0.0012, 'shadow_fraction': 0.5, 'shadow_penalty': 0.1},
+        enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True,
+        max_dp_hops=5,
+    ),
     'Stochastic - Unaware': dict(
         harvesting_profile='stochastic',
         harvesting_kwargs={'lambda_rate': 2.0, 'quantum': 0.00015},
         enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False,
+        routing_algorithm='dijkstra'
     ),
     'Stochastic - Adaptive (Time-DP)': dict(
         harvesting_profile='stochastic',
@@ -133,11 +159,21 @@ def main():
         )
 
     print()
+    sh_u  = results['Shadowed - Unaware']
+    sh_ea = results['Shadowed - Energy-Aware']
+    sh_ad = results['Shadowed - Adaptive (Time-DP)']
+    delta_sh_fnd = mean(sh_ad['fnd']) - mean(sh_u['fnd'])
+    delta_sh_alive = mean(sh_ad['alive']) - mean(sh_u['alive'])
+    print(f"Key comparison 1 (Heterogeneous Shadowed: Adaptive Time-DP vs Unaware Dijkstra):")
+    print(f"  delta FND   = {delta_sh_fnd:+.1f} rounds  (pooled std: {std(sh_u['fnd'] + sh_ad['fnd']):.1f})")
+    print(f"  delta Alive = {delta_sh_alive:+.2f} nodes   (pooled std: {std(sh_u['alive'] + sh_ad['alive']):.2f})")
+
+    print()
     su  = results['Stochastic - Unaware']
     sa  = results['Stochastic - Adaptive (Time-DP)']
     delta_fnd   = mean(sa['fnd'])   - mean(su['fnd'])
     delta_alive = mean(sa['alive']) - mean(su['alive'])
-    print(f"Key comparison (Stochastic Adaptive vs Unaware):")
+    print(f"Key comparison 2 (Stochastic Adaptive vs Unaware):")
     print(f"  delta FND   = {delta_fnd:+.1f} rounds  (pooled std: {std(su['fnd'] + sa['fnd']):.1f})")
     print(f"  delta Alive = {delta_alive:+.2f} nodes   (pooled std: {std(su['alive'] + sa['alive']):.2f})")
     print()

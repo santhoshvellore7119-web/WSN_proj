@@ -56,8 +56,12 @@ def dp_lifetime_maximin_path(
             # Try routing to active sensor neighbors
             if u in adj_list:
                 for v, _ in adj_list[u]:
-                    if v not in alive_nodes:
+                    if v not in alive_nodes or v == source:
                         continue
+                    if transmission_range is not None:
+                        dist_uv = ((nodes[u].x - nodes[v].x)**2 + (nodes[u].y - nodes[v].y)**2)**0.5
+                        if dist_uv > transmission_range:
+                            continue
                     candidate = min(bottleneck_u, nodes[v].residual_energy)
                     if v not in dp:
                         dp[v] = {}

@@ -141,6 +141,107 @@ def dijkstra(
     return path, total_cost
 
 
+def energy_aware_dijkstra(
+    nodes: Dict[int, Node],
+    adj_list: Dict[int, List[Tuple[int, float]]],
+    start: int,
+    base_station_pos: Tuple[float, float],
+    energy_model: EnergyModel,
+    alive_nodes: Set[int],
+    k: int = 1,
+    alpha: float = 1.0,
+    transmission_range: Optional[float] = None
+) -> Tuple[Optional[List[int]], float]:
+    """
+    Energy-Aware Dijkstra (Minimum Battery Cost Routing / MBCR style).
+    
+    Penalizes edges that route through low-energy relay nodes by weighting
+    the physical transmission energy inversely with the receiver's residual energy:
+      weight(u -> v) = E_tx(u, v) * (1 + (E_init / (E_res(v) + epsilon)))^alpha
+    
+    This provides a strong, standard energy-aware baseline to benchmark Time-DP against.
+    """
+    if start not in alive_nodes:
+        return None, float('inf')
+
+    dist: Dict[int, float] = {node_id: float('inf') for node_id in nodes}
+    dist[start] = 0.0
+    prev: Dict[int, Optional[int]] = {node_id: None for node_id in nodes}
+
+    pq: List[Tuple[float, int]] = [(0.0, start)]
+    visited: Set[int] = set()
+
+    while pq:
+        current_dist, u = heapq.heappop(pq)
+        if u in visited:
+            continue
+        visited.add(u)
+
+        if u == -1:
+            break
+
+        neighbors: List[Tuple[int, float]] = []
+        if u in adj_list:
+            for v, _ in adj_list[u]:
+                if v in alive_nodes and v != start:
+                    if transmission_range is not None:
+                        dist_uv = ((nodes[u].x - nodes[v].x)**2 + (nodes[u].y - nodes[v].y)**2)**0.5
+                        if dist_uv > transmission_range:
+                            continue
+                    else:
+                        dist_uv = nodes[u].distance_to(nodes[v])
+                    
+                    tx_energy = energy_model.transmit_energy(k, dist_uv) + energy_model.receive_energy(k)
+                    v_node = nodes[v]
+                    # Penalty factor inversely proportional to residual energy
+                    init_e = getattr(v_node, 'initial_energy', 1.0)
+                    res_e = max(1e-9, v_node.residual_energy)
+                    penalty = (1.0 + (init_e / res_e)) ** alpha
+                    weight = tx_energy * penalty
+                    neighbors.append((v, weight))
+
+        # Check edge to base station (-1)
+        if u in alive_nodes:
+            u_node = nodes[u]
+            dist_to_bs = math.sqrt((u_node.x - base_station_pos[0])**2 + (u_node.y - base_station_pos[1])**2)
+            if transmission_range is None or dist_to_bs <= transmission_range:
+                weight_to_bs = energy_model.transmit_energy(k, dist_to_bs)
+                neighbors.append((-1, weight_to_bs))
+
+        for v, weight in neighbors:
+            if v not in dist:
+                dist[v] = float('inf')
+                prev[v] = None
+            alt = current_dist + weight
+            if alt < dist[v]:
+                dist[v] = alt
+                prev[v] = u
+                heapq.heappush(pq, (alt, v))
+
+    if dist.get(-1, float('inf')) == float('inf'):
+        return None, float('inf')
+
+    path: List[int] = []
+    current: Optional[int] = -1
+    while current is not None:
+        path.append(current)
+        current = prev.get(current)
+    path.reverse()
+
+    # Calculate actual physical transmission energy for comparability
+    actual_physical_energy = 0.0
+    for i in range(len(path) - 1):
+        src_id = path[i]
+        dst_id = path[i + 1]
+        if dst_id == -1:
+            d = math.sqrt((nodes[src_id].x - base_station_pos[0])**2 + (nodes[src_id].y - base_station_pos[1])**2)
+        else:
+            d = nodes[src_id].distance_to(nodes[dst_id])
+        actual_physical_energy += energy_model.transmit_energy(k, d)
+
+    return path, actual_physical_energy
+
+
 def astar(
     nodes: Dict[int, Node],
     adj_list: Dict[int, List[Tuple[int, float]]],
@@ -287,6 +388,7 @@ def rip_up_and_reroute(
 
     # Check candidates for local detour from u_prev
     candidates: List[Tuple[float, int, List[int]]] = []
+    next_target = active_path[fail_idx + 1] if fail_idx + 1 < len(active_path) else -1
 
     # Option 1: Send directly from u_prev to BS if in range
     u_prev_node = nodes[u_prev]
@@ -295,23 +397,43 @@ def rip_up_and_reroute(
         cost_direct = energy_model.transmit_energy(k, dist_direct_bs)
         candidates.append((cost_direct, -1, [-1]))
 
-    # Option 2: Alternate neighbors of u_prev connected to BS
+    # Option 2: Local bridge detour (u_prev -> v -> next_target) in O(deg(u_prev))
     if u_prev in adj_list:
         for v, _ in adj_list[u_prev]:
             if v in viable_nodes and v != failed_node_id and uf.find(v) == bs_root:
-                dist_uv = u_prev_node.distance_to(nodes[v])
+                v_node = nodes[v]
+                dist_uv = u_prev_node.distance_to(v_node)
                 if transmission_range is not None and dist_uv > transmission_range:
                     continue
                 cost_uv = energy_model.transmit_energy(k, dist_uv)
-                # Shortest path from neighbor v to BS
-                sub_path, sub_cost = dijkstra(
-                    nodes, adj_list, start=v, base_station_pos=base_station_pos,
-                    energy_model=energy_model, alive_nodes=viable_nodes, k=k,
-                    transmission_range=transmission_range
-                )
-                if sub_path is not None:
-                    total_candidate_cost = cost_uv + sub_cost
-                    candidates.append((total_candidate_cost, v, sub_path))
+
+                # Check if v can directly bridge to next_target
+                can_reach_next = False
+                cost_v_next = 0.0
+                if next_target == -1:
+                    d_bs = math.sqrt((v_node.x - base_station_pos[0])**2 + (v_node.y - base_station_pos[1])**2)
+                    if transmission_range is None or d_bs <= transmission_range:
+                        can_reach_next = True
+                        cost_v_next = energy_model.transmit_energy(k, d_bs)
+                elif next_target in viable_nodes:
+                    d_target = v_node.distance_to(nodes[next_target])
+                    if transmission_range is None or d_target <= transmission_range:
+                        can_reach_next = True
+                        cost_v_next = energy_model.transmit_energy(k, d_target)
+
+                if can_reach_next:
+                    suffix = active_path[fail_idx + 1:]
+                    candidates.append((cost_uv + cost_v_next, v, [v] + suffix))
+
+    # Option 3: Fallback single search from u_prev to BS if local bridge not available
+    if not candidates and uf.find(u_prev) == bs_root:
+        sub_path, sub_cost = dijkstra(
+            nodes, adj_list, start=u_prev, base_station_pos=base_station_pos,
+            energy_model=energy_model, alive_nodes=viable_nodes, k=k,
+            transmission_range=transmission_range
+        )
+        if sub_path is not None and len(sub_path) >= 2:
+            return active_path[:fail_idx - 1] + sub_path, sub_cost
 
     if not candidates:
         return None, float('inf')
@@ -366,9 +488,102 @@ def compute_routes_for_cluster_heads(
                 alive_nodes, transmission_range=transmission_range
             )
             routes[ch] = (path, cost)
+        elif algorithm in ('energy_dijkstra', 'energy_aware_dijkstra', 'energy_aware'):
+            path, cost = energy_aware_dijkstra(
+                nodes, graph.adjacency_list, ch, base_station_pos, energy_model,
+                alive_nodes, transmission_range=transmission_range
+            )
+            routes[ch] = (path, cost)
         else:
-            raise ValueError("Algorithm must be 'dijkstra' or 'astar'")
+            raise ValueError(f"Unknown routing algorithm: {algorithm}. Must be 'dijkstra', 'astar', or 'energy_dijkstra'")
     return routes
+
+
+def benchmark_dsu_vs_recompute(
+    nodes: Dict[int, Node],
+    graph: Graph,
+    energy_model: EnergyModel,
+    active_path: List[int],
+    failed_node_idx: int,
+    base_station_pos: Tuple[float, float],
+    alive_nodes: Set[int],
+    harvesting_model: Optional[Any] = None,
+    current_time: int = 0,
+    max_dp_hops: int = 5,
+    trials: int = 100
+) -> Dict[str, Any]:
+    """
+    Directly compares the runtime of DSU live detour rerouting versus
+    full Time-DP / Dijkstra recomputation from scratch when a node fails mid-route.
+    """
+    if len(active_path) < 3 or failed_node_idx <= 0 or failed_node_idx >= len(active_path) - 1:
+        return {}
+
+    failed_node = active_path[failed_node_idx]
+    source = active_path[0]
+    viable_nodes = set(alive_nodes) - {failed_node}
+
+    # 1. Benchmark DSU live detour
+    t0 = time.perf_counter()
+    dsu_path = None
+    dsu_cost = float('inf')
+    for _ in range(trials):
+        dsu_path, dsu_cost = rip_up_and_reroute(
+            nodes=nodes,
+            adj_list=graph.adjacency_list,
+            failed_node_id=failed_node,
+            active_path=active_path,
+            base_station_pos=base_station_pos,
+            energy_model=energy_model,
+            alive_nodes=alive_nodes,
+            harvesting_model=harvesting_model,
+            current_time=current_time
+        )
+    dsu_time_sec = (time.perf_counter() - t0) / trials
+
+    # 2. Benchmark full Dijkstra from source
+    t0 = time.perf_counter()
+    dijk_path = None
+    dijk_cost = float('inf')
+    for _ in range(trials):
+        dijk_path, dijk_cost = dijkstra(
+            nodes=nodes,
+            adj_list=graph.adjacency_list,
+            start=source,
+            base_station_pos=base_station_pos,
+            energy_model=energy_model,
+            alive_nodes=viable_nodes
+        )
+    dijk_time_sec = (time.perf_counter() - t0) / trials
+
+    # 3. Benchmark full Time-DP from source
+    from dp_lifetime import dp_time_augmented_lifetime
+    t0 = time.perf_counter()
+    dp_path = None
+    for _ in range(trials):
+        _, dp_path, _ = dp_time_augmented_lifetime(
+            nodes=nodes,
+            adj_list=graph.adjacency_list,
+            source=source,
+            base_station_pos=base_station_pos,
+            energy_model=energy_model,
+            alive_nodes=viable_nodes,
+            harvesting_model=harvesting_model,
+            current_time=current_time,
+            max_hops=max_dp_hops
+        )
+    dp_time_sec = (time.perf_counter() - t0) / trials
+
+    return {
+        'dsu_time_us': dsu_time_sec * 1e6,
+        'dijkstra_time_us': dijk_time_sec * 1e6,
+        'time_dp_time_us': dp_time_sec * 1e6,
+        'speedup_vs_dijkstra': dijk_time_sec / max(1e-12, dsu_time_sec),
+        'speedup_vs_time_dp': dp_time_sec / max(1e-12, dsu_time_sec),
+        'dsu_found_route': dsu_path is not None,
+        'dsu_path': dsu_path
+    }
+
 
 
 def compare_dijkstra_astar(
