@@ -120,12 +120,10 @@ wsn-energy-routing/
 ├── tests/                      # Pytest unit tests (31 tests)
 ├── results/                    # Saved plots and CSV output logs
 ├── report/
-│   ├── time_augmented_dp_summary.md  # Detailed algorithm notes
-│   └── first_review_report.md        # Project review report
+│   └── time_augmented_dp_summary.md  # Detailed algorithm notes & recurrence proofs
 ├── run_experiments.py          # Runs the 5 benchmark comparison scenarios
 ├── run_multiseed.py            # Multi-seed (N=5) statistical validation script
-├── run_simulation.py           # Runs a single sample simulation
-├── main.py                     # CLI entrypoint
+├── main.py                     # CLI entrypoint for custom runs and benchmarks
 ├── requirements.txt            # Python dependencies
 └── README.md                   # Project overview
 ```
