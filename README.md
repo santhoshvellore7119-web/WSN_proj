@@ -59,21 +59,21 @@ We reconstruct the path and arrival timeline by following predecessor pointers s
 
 ## Experimental Results
 
-We tested 5 different configurations across a 50-node network over 350 rounds (field $100\text{m} \times 100\text{m}$, initial energy $0.045\text{ J}$, random seed 42):
+We tested 5 configurations across a 50-node network over 350 rounds (field $100\text{m} \times 100\text{m}$, initial energy $0.045\text{ J}$, battery cap $0.50\text{ J}$, seed 42). Results are fully deterministic — running `run_experiments.py` twice produces identical output.
 
 | Configuration | First Node Death (FND) | Half Nodes Dead (HND) | Alive Nodes (Round 350) | Total Residual Energy |
 | :--- | :--- | :--- | :--- | :--- |
-| **Baseline (No Harvesting)** | Round 92 | Round 110 | 0 / 50 | 0.0000 J |
-| **Solar (Unaware LEACH + Dijkstra)** | Round 156 | Round 209 | 0 / 50 | 0.0000 J |
-| **Solar (Adaptive Time-DP)** | Round 99 | Round 207 | 1 / 50 | 0.0213 J |
-| **Stochastic Poisson (Unaware LEACH)** | Round 254 | N/A | 39 / 50 | 0.1673 J |
-| **Stochastic Poisson (Adaptive Time-DP)** | Round 283 | N/A | **39 / 50** | **0.1852 J** |
+| **Baseline (No Harvesting)** | Round 82 | Round 112 | 0 / 50 | 0.0000 J |
+| **Solar (Unaware LEACH + Dijkstra)** | Round 165 | Round 209 | 0 / 50 | 0.0000 J |
+| **Solar (Adaptive Time-DP)** | Round 165 | Round 208 | 0 / 50 | 0.0000 J |
+| **Stochastic Poisson (Unaware LEACH)** | Round 320 | N/A | 40 / 50 | 0.2581 J |
+| **Stochastic Poisson (Adaptive Time-DP)** | Round 329 | N/A | **41 / 50** | 0.2532 J |
 
 ### Takeaways:
-- Even without harvesting awareness, solar recharge nearly doubles operational rounds before first node death (round 92 → 156).
-- Under stochastic Poisson harvesting, the cost-aware Time-Augmented DP pushes FND from round 254 to round 283 (+11.4%) and retains 10.7% more total energy (0.1673 J → 0.1852 J) compared to the harvesting-unaware LEACH+Dijkstra baseline.
-- The solar adaptive scenario trades a slightly lower FND for higher residual energy at round 350 (0.0213 J vs. 0.0000 J), as the DP routes conservatively through nodes projected to have higher future energy — an expected trade-off between spreading early load and preserving late-round coverage.
-- The cost-aware tie-breaking addition (preference for lower physical transmission cost when two paths have bottleneck values within 1%) is what prevents the adaptive DP from being strictly worse than Dijkstra in the stochastic scenario.
+- Solar harvesting (peak rate 0.6 mJ/round, 12-hour day cycle) alone extends first-node-death from round 82 to round 165 — the recharge exactly compensates normal LEACH drain at this parameter setting, so both solar configurations exhaust around the same round.
+- Under stochastic Poisson harvesting (λ=2 events/round, 0.15 mJ/event), the cost-aware Time-Augmented DP extends FND from round 320 to round 329 (+2.8%) and keeps one additional node alive at round 350 (41 vs 40), at the cost of slightly lower total residual energy (0.2532 J vs 0.2581 J).
+- The slight energy trade-off in the stochastic scenario is expected: the DP distributes relay load across more nodes rather than hammering the same low-cost path, which means more nodes participate in routing — reducing peak depletion but spreading cost more evenly. The network lifetime improvement (more alive nodes, higher FND) is the primary metric.
+
 
 ---
 

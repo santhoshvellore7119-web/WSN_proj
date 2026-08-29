@@ -98,10 +98,15 @@ class Simulator:
     def _create_nodes(self):
         """Places sensor nodes uniformly in the simulation area."""
         import random
-        rng = random.Random(self.seed) if self.seed is not None else random.Random()
+        # Two separate RNG streams seeded deterministically:
+        # - placement_rng: controls node (x, y) coordinates
+        # - self._rng: controls all per-round stochastic draws (CH election, etc.)
+        # Using seed+1 for the second stream keeps them independent.
+        placement_rng = random.Random(self.seed) if self.seed is not None else random.Random()
+        self._rng: Optional[random.Random] = random.Random(self.seed + 1) if self.seed is not None else None
         for i in range(self.num_nodes):
-            x = rng.uniform(0, self.area_width)
-            y = rng.uniform(0, self.area_height)
+            x = placement_rng.uniform(0, self.area_width)
+            y = placement_rng.uniform(0, self.area_height)
             self.nodes[i] = Node(
                 node_id=i,
                 x=x,
@@ -142,7 +147,8 @@ class Simulator:
             desired_clusters_ratio=self.desired_clusters_ratio,
             harvesting_model=ch_model,
             current_time=self.round_number,
-            lookahead_rounds=1
+            lookahead_rounds=1,
+            rng=self._rng
         )
 
         for nid, node in self.nodes.items():

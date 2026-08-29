@@ -24,7 +24,8 @@ def leach_clustering(
     threshold_multiplier: float = 1.0,
     harvesting_model: Optional[HarvestingProfile] = None,
     current_time: int = 0,
-    lookahead_rounds: int = 1
+    lookahead_rounds: int = 1,
+    rng: Optional[random.Random] = None
 ) -> Tuple[Dict[int, int], List[int]]:
     """
     Elects cluster heads for the current round and assigns member nodes
@@ -71,9 +72,10 @@ def leach_clustering(
         node_probabilities[nid] = min(prob, 1.0)
 
     # 3. Candidate selection with min-heap tiebreaker
+    _draw = rng.random if rng is not None else random.random
     candidates = []
     for nid, prob in node_probabilities.items():
-        rand_val = random.random()
+        rand_val = _draw()
         if rand_val < prob:
             heapq.heappush(candidates, (rand_val, -effective_energies[nid], nid))
 
@@ -125,7 +127,8 @@ def simulate_clustering_round(
     desired_clusters_ratio: float = 0.05,
     harvesting_model: Optional[HarvestingProfile] = None,
     current_time: int = 0,
-    lookahead_rounds: int = 1
+    lookahead_rounds: int = 1,
+    rng: Optional[random.Random] = None
 ) -> Tuple[Dict[int, int], List[int], Dict[int, float]]:
     """Runs a single round of clustering and returns cluster stats."""
     alive_count = sum(1 for node in nodes.values() if node.is_alive)
@@ -138,7 +141,8 @@ def simulate_clustering_round(
         desired_clusters_ratio=desired_clusters_ratio,
         harvesting_model=harvesting_model,
         current_time=current_time,
-        lookahead_rounds=lookahead_rounds
+        lookahead_rounds=lookahead_rounds,
+        rng=rng
     )
 
     debug_info = {
