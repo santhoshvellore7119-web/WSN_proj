@@ -96,7 +96,7 @@ To verify that results are not an artefact of a single lucky topology, we evalua
 
 ## Output Figures
 
-Generated plots are saved in the `results/` folder:
+When running simulations, plots and logs are automatically generated and saved to the `results/` directory:
 - `network_lifetime_comparison.png`: Comparison curves of alive nodes and residual energy over rounds.
 - `energy_heatmap_solar.png`: 2D heatmap showing per-node energy levels through day/night solar cycles.
 - `energy_heatmap_stochastic.png`: Heatmap under stochastic Poisson energy arrivals.
@@ -118,12 +118,12 @@ wsn-energy-routing/
 │   ├── simulator.py            # Simulation loop coordinating all phases
 │   └── visualize.py            # Matplotlib plotting scripts
 ├── tests/                      # Pytest unit tests (31 tests)
-├── results/                    # Saved plots and CSV output logs
 ├── report/
 │   └── time_augmented_dp_summary.md  # Detailed algorithm notes & recurrence proofs
 ├── run_experiments.py          # Runs the 5 benchmark comparison scenarios
 ├── run_multiseed.py            # Multi-seed (N=5) statistical validation script
 ├── main.py                     # CLI entrypoint for custom runs and benchmarks
+├── pytest.ini                  # Pytest configuration
 ├── requirements.txt            # Python dependencies
 └── README.md                   # Project overview
 ```
