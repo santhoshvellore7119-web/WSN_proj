@@ -2,6 +2,20 @@
 
 A 2nd-year B.Tech Data Structures & Algorithms course project exploring adaptive routing in Wireless Sensor Networks (WSNs) with ambient energy harvesting.
 
+## 🚀 Enhanced Version Available!
+
+An enhanced version of this simulator is now available with a **REST API backend** and **React frontend** for interactive simulation configuration, visualization, and benchmarking. Features include:
+
+- **Web-based interface** for real-time parameter adjustment and results visualization
+- **REST API** for programmatic access and automation  
+- **Persistence layer** (SQLite) to save and compare simulation runs
+- **Interactive visualizations**: network topology, time-series charts, and energy heatmaps
+- **One-click benchmarking** to run standard comparison scenarios
+
+To use the enhanced version, see the [`backend/`](../tree/main/backend) and [`frontend/`](../tree/main/frontend) directories, or read the [Enhanced Version README](../README_ENHANCED.md) for detailed setup instructions.
+
+The core simulator in [`src/`](../tree/main/src) remains unchanged and fully functional via the original CLI.
+
 ---
 
 ## About the Project

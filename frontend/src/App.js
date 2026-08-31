@@ -4,6 +4,9 @@ import ControlPanel from './components/ControlPanel';
 import NetworkView from './components/NetworkView';
 import Chart from './components/Chart';
 import { useSimulation } from './hooks/useSimulation';
+import ScrubberView from './components/ScrubberView';
+import HeatmapView from './components/HeatmapView';
+import BenchmarkView from './components/BenchmarkView';
 import './App.css';
 
 function App() {
@@ -18,7 +21,10 @@ function App() {
     reset
   } = useSimulation();
 
-  const [activeTab, setActiveTab] = useState('results'); // results, network, charts
+  const [activeTab, setActiveTab] = useState('results'); // results, network, charts, scrubber, heatmap, benchmark
+
+  // Process results for visualization
+  const processedResults = results?.results || {};
 
   const handleRunSimulation = () => {
     runSimulation(config);
@@ -27,11 +33,8 @@ function App() {
 
   const handleRunBenchmark = () => {
     runBenchmark(config);
-    setActiveTab('results');
+    setActiveTab('benchmark');
   };
-
-  // Process results for visualization
-  const processedResults = results?.results || {};
 
   return (
     <div className="App">
@@ -191,6 +194,27 @@ function App() {
               )}
             </div>
           )}
+
+          {/* Scrubber Tab */}
+          {activeTab === 'scrubber' && (
+            <div className="tab-content">
+              <ScrubberView simulationData={processedResults} />
+            </div>
+          )}
+
+          {/* Heatmap Tab */}
+          {activeTab === 'heatmap' && (
+            <div className="tab-content">
+              <HeatmapView simulationData={processedResults} />
+            </div>
+          )}
+
+          {/* Benchmark Tab */}
+          {activeTab === 'benchmark' && (
+            <div className="tab-content">
+              <BenchmarkView />
+            </div>
+          )}
         </main>
       </div>
 
@@ -216,6 +240,27 @@ function App() {
           disabled={loading && !results}
         >
           Charts
+        </button>
+        <button
+          className={activeTab === 'scrubber' ? 'active' : ''}
+          onClick={() => setActiveTab('scrubber')}
+          disabled={loading && !results}
+        >
+          Scrubber
+        </button>
+        <button
+          className={activeTab === 'heatmap' ? 'active' : ''}
+          onClick={() => setActiveTab('heatmap')}
+          disabled={loading && !results}
+        >
+          Heatmap
+        </button>
+        <button
+          className={activeTab === 'benchmark' ? 'active' : ''}
+          onClick={() => setActiveTab('benchmark')}
+          disabled={loading && !results}
+        >
+          Benchmark
         </button>
       </div>
     </div>
