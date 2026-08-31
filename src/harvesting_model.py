@@ -11,7 +11,7 @@ Supports:
 import math
 import random
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Union, List
+from typing import Dict, Optional, Union, List, Any, Tuple
 
 
 class HarvestingProfile(ABC):
@@ -179,6 +179,71 @@ class HeterogeneousHarvesting(HarvestingProfile):
         return f"HeterogeneousHarvesting(default={self.default_profile}, custom_nodes={len(self.node_profiles)})"
 
 
+def create_shadowed_solar_profile(
+    nodes: Dict[int, Any],
+    peak_rate: float = 0.0012,
+    shadow_fraction: float = 0.5,
+    shadow_penalty: float = 0.1,
+    period: int = 24,
+    day_fraction: float = 0.5,
+    seed: Optional[int] = None
+) -> HeterogeneousHarvesting:
+    """
+    Creates a spatially heterogeneous solar environment (e.g. building shadow or canopy occlusion).
+    Nodes on one half (x < shadow_cutoff or selected by shadow_fraction) experience heavily reduced
+    solar irradiance, while the remaining nodes receive full sunlight.
+    """
+    sunny_profile = SolarPeriodicHarvesting(
+        peak_rate=peak_rate,
+        period=period,
+        day_fraction=day_fraction,
+        seed=seed
+    )
+    shadowed_profile = SolarPeriodicHarvesting(
+        peak_rate=peak_rate * shadow_penalty,
+        period=period,
+        day_fraction=day_fraction,
+        seed=seed + 1 if seed is not None else None
+    )
+
+    node_profiles: Dict[int, HarvestingProfile] = {}
+    if nodes:
+        xs = [node.x for node in nodes.values()]
+        min_x, max_x = min(xs), max(xs)
+        cutoff_x = min_x + (max_x - min_x) * shadow_fraction
+        for nid, node in nodes.items():
+            if node.x < cutoff_x:
+                node_profiles[nid] = shadowed_profile
+            else:
+                node_profiles[nid] = sunny_profile
+    return HeterogeneousHarvesting(default_profile=sunny_profile, node_profiles=node_profiles)
+
+
+def create_rf_hotspot_profile(
+    nodes: Dict[int, Any],
+    hotspot_center: Tuple[float, float] = (75.0, 75.0),
+    hotspot_radius: float = 35.0,
+    hotspot_rate: float = 0.0015,
+    background_rate: float = 0.0001
+) -> HeterogeneousHarvesting:
+    """
+    Creates a spatial RF power transfer hotspot. Nodes within hotspot_radius of
+    hotspot_center receive steady power transfer, while peripheral nodes have minimal background energy.
+    """
+    hotspot_profile = ConstantHarvesting(rate=hotspot_rate)
+    background_profile = ConstantHarvesting(rate=background_rate)
+
+    node_profiles: Dict[int, HarvestingProfile] = {}
+    for nid, node in nodes.items():
+        dist = math.sqrt((node.x - hotspot_center[0])**2 + (node.y - hotspot_center[1])**2)
+        if dist <= hotspot_radius:
+            node_profiles[nid] = hotspot_profile
+        else:
+            node_profiles[nid] = background_profile
+
+    return HeterogeneousHarvesting(default_profile=background_profile, node_profiles=node_profiles)
+
+
 def create_harvesting_model(
     model_type: str = 'solar',
     **kwargs
@@ -202,5 +267,28 @@ def create_harvesting_model(
         quantum = kwargs.get('quantum', 0.015)
         seed = kwargs.get('seed', None)
         return StochasticHarvesting(lambda_rate=lam, quantum=quantum, seed=seed)
+    elif model_type in ('heterogeneous_shadowed', 'shadowed', 'shadow'):
+        nodes = kwargs.get('nodes', {})
+        peak = kwargs.get('peak_rate', 0.0012)
+        shadow_frac = kwargs.get('shadow_fraction', 0.5)
+        shadow_pen = kwargs.get('shadow_penalty', 0.1)
+        period = kwargs.get('period', 24)
+        day_frac = kwargs.get('day_fraction', 0.5)
+        seed = kwargs.get('seed', None)
+        return create_shadowed_solar_profile(
+            nodes=nodes, peak_rate=peak, shadow_fraction=shadow_frac,
+            shadow_penalty=shadow_pen, period=period, day_fraction=day_frac, seed=seed
+        )
+    elif model_type in ('heterogeneous_rf', 'rf_hotspot', 'hotspot'):
+        nodes = kwargs.get('nodes', {})
+        center = kwargs.get('hotspot_center', (75.0, 75.0))
+        radius = kwargs.get('hotspot_radius', 35.0)
+        rate = kwargs.get('hotspot_rate', 0.0015)
+        bg = kwargs.get('background_rate', 0.0001)
+        return create_rf_hotspot_profile(
+            nodes=nodes, hotspot_center=center, hotspot_radius=radius,
+            hotspot_rate=rate, background_rate=bg
+        )
     else:
         raise ValueError(f"Unknown harvesting model type: {model_type}")
+

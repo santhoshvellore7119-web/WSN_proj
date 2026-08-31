@@ -67,17 +67,19 @@ class Simulator:
         self.transmission_range = transmission_range
         self.seed = seed
 
-        if isinstance(harvesting_profile, str):
-            kwargs = harvesting_kwargs or {}
-            self.harvesting_model: Optional[HarvestingProfile] = create_harvesting_model(harvesting_profile, **kwargs)
-        else:
-            self.harvesting_model = harvesting_profile
-
         # Initialize nodes and network graph
         self.nodes: Dict[int, Node] = {}
         self._create_nodes()
         self.graph = Graph(self.nodes)
         self.energy_model = EnergyModel()
+
+        if isinstance(harvesting_profile, str):
+            kwargs = dict(harvesting_kwargs or {})
+            if 'nodes' not in kwargs:
+                kwargs['nodes'] = self.nodes
+            self.harvesting_model: Optional[HarvestingProfile] = create_harvesting_model(harvesting_profile, **kwargs)
+        else:
+            self.harvesting_model = harvesting_profile
 
         # Track history for plotting and metrics
         self.round_number = 0
@@ -382,8 +384,8 @@ def main():
     parser.add_argument('--enable-time-dp', action='store_true', help='Enable Time-Augmented DP')
     parser.add_argument('--enable-harvesting-ch', action='store_true', help='Enable harvesting-aware CH rotation')
     parser.add_argument('--enable-live-reroute', action='store_true', help='Enable DSU live reroute')
-    parser.add_argument('--harvesting', type=str, default='solar', choices=['solar', 'stochastic', 'constant', 'none'], help='Harvesting profile')
-    parser.add_argument('--routing', type=str, choices=['dijkstra', 'astar'], default='dijkstra', help='Routing algorithm')
+    parser.add_argument('--harvesting', type=str, default='solar', choices=['solar', 'stochastic', 'constant', 'none', 'shadowed', 'hotspot'], help='Harvesting profile')
+    parser.add_argument('--routing', type=str, choices=['dijkstra', 'astar', 'energy_dijkstra'], default='dijkstra', help='Routing algorithm')
     args = parser.parse_args()
 
     sim = Simulator(

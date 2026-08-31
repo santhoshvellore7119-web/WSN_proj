@@ -33,7 +33,7 @@ def parse_args():
         "--harvesting-profile",
         type=str,
         default="solar",
-        choices=["none", "constant", "solar", "stochastic"],
+        choices=["none", "constant", "solar", "stochastic", "shadowed", "hotspot"],
         help="Energy harvesting profile"
     )
     parser.add_argument("--solar-peak", type=float, default=0.03, help="Solar peak recharge rate (J/round)")
@@ -45,7 +45,7 @@ def parse_args():
     parser.add_argument("--disable-harvesting-ch", action="store_true", help="Disable harvest-weighted cluster head rotation")
     parser.add_argument("--disable-live-reroute", action="store_true", help="Disable DSU live rerouting")
     parser.add_argument("--max-dp-hops", type=int, default=5, help="Max hop horizon for DP")
-    parser.add_argument("--routing-algorithm", type=str, default="dijkstra", choices=["dijkstra", "astar"])
+    parser.add_argument("--routing-algorithm", type=str, default="dijkstra", choices=["dijkstra", "astar", "energy_dijkstra"])
     parser.add_argument("--seed", type=int, default=42, help="Random seed for node positions")
 
     # Outputs
@@ -67,6 +67,10 @@ def main():
     harv_kwargs = {}
     if harv_profile == "solar":
         harv_kwargs = {'peak_rate': args.solar_peak, 'period': 24, 'day_fraction': 0.5, 'seed': args.seed}
+    elif harv_profile == "shadowed":
+        harv_kwargs = {'peak_rate': args.solar_peak, 'shadow_fraction': 0.5, 'shadow_penalty': 0.1, 'seed': args.seed}
+    elif harv_profile == "hotspot":
+        harv_kwargs = {'hotspot_center': (args.area * 0.75, args.area * 0.75), 'hotspot_radius': args.area * 0.35, 'hotspot_rate': 0.0015}
     elif harv_profile == "stochastic":
         harv_kwargs = {'lambda_rate': args.stoch_lambda, 'quantum': args.stoch_quantum, 'seed': args.seed}
     elif harv_profile == "constant":
