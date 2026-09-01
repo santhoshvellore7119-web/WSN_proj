@@ -111,3 +111,36 @@ def test_rip_up_and_reroute_direct_bs():
 
     assert new_path == [0, 1, -1]
     assert cost > 0.0
+
+
+def test_dsu_reroute_graceful_failure_disconnected():
+    """Verifies that rip_up_and_reroute returns (None, inf) cleanly without crashing when network is disconnected."""
+    nodes = {
+        0: Node(0, 0, 0, initial_energy=2.0),
+        1: Node(1, 100, 0, initial_energy=1.8),
+        2: Node(2, 200, 0, initial_energy=0.0),  # Failed node
+    }
+    for n in nodes.values():
+        n.is_alive = True
+    nodes[2].is_alive = False
+
+    adj = {0: [(1, 100.0)], 1: [(2, 100.0)], 2: []}
+    em = EnergyModel()
+    base_station = (500, 500)  # Very far away BS (500m > transmission_range)
+    alive = {0, 1}
+    active_path = [0, 1, 2, -1]
+
+    new_path, cost = rip_up_and_reroute(
+        nodes=nodes,
+        adj_list=adj,
+        failed_node_id=2,
+        active_path=active_path,
+        base_station_pos=base_station,
+        energy_model=em,
+        alive_nodes=alive,
+        transmission_range=30.0  # Tight range, impossible to reach BS
+    )
+
+    assert new_path is None
+    assert cost == float('inf')
+

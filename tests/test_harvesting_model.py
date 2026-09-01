@@ -103,3 +103,21 @@ def test_create_harvesting_model_factory():
     z = create_harvesting_model('none')
     assert isinstance(z, ConstantHarvesting)
     assert z.rate == 0.0
+
+
+def test_projected_vs_realized_harvest_accuracy():
+    """Verifies that project_energy matches step-by-step realized harvest accumulation without drift."""
+    solar = SolarPeriodicHarvesting(peak_rate=0.05, period=24, day_fraction=0.5, solar_noise=0.0)
+    init_energy = 0.10
+    capacity = 0.50
+
+    # Project 10 steps ahead from t = 0 to t = 10
+    projected = solar.project_energy(node_id=0, current_energy=init_energy, current_time=0, target_time=10, battery_capacity=capacity)
+
+    # Step-by-step realized energy
+    realized = init_energy
+    for t in range(10):
+        realized = min(capacity, realized + solar.sample_harvest(node_id=0, current_time=t))
+
+    assert projected == pytest.approx(realized, abs=1e-6)
+

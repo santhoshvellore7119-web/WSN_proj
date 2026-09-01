@@ -2,6 +2,7 @@
 Test for dp_lifetime.py
 """
 import sys
+import pytest
 sys.path.append('../src')
 
 from dp_lifetime import dp_lifetime_maximin_path
@@ -111,8 +112,72 @@ def test_dp_lifetime_no_path():
     assert path == []
     print("No path with max_hops=0: PASS")
 
+
+def test_dp_battery_clamping_at_max_capacity():
+    """Verifies that Time-DP correctly clamps projected node energy at max_battery_capacity."""
+    from dp_lifetime import dp_time_augmented_lifetime
+    from harvesting_model import ConstantHarvesting
+
+    nodes = {
+        0: Node(0, 0, 0, initial_energy=0.9, max_energy=1.0),
+        1: Node(1, 10, 0, initial_energy=0.9, max_energy=1.0)
+    }
+    for n in nodes.values():
+        n.is_alive = True
+
+    graph = Graph(nodes)
+    em = EnergyModel()
+    harv = ConstantHarvesting(rate=0.5)  # huge harvest rate
+
+    lifetime, path, sched = dp_time_augmented_lifetime(
+        nodes=nodes,
+        adj_list=graph.adjacency_list,
+        source=1,
+        base_station_pos=(0, 0),
+        energy_model=em,
+        alive_nodes={0, 1},
+        harvesting_model=harv,
+        max_hops=2
+    )
+
+    assert path == [1, -1] or path == [1, 0, -1]
+    # Projected energy should never exceed node max_energy (1.0 J)
+    assert lifetime <= 1.0
+
+
+def test_dp_zero_harvest_fallback():
+    """Verifies Time-DP behavior when harvesting profile is zero."""
+    from dp_lifetime import dp_time_augmented_lifetime
+    from harvesting_model import ConstantHarvesting
+
+    nodes = {
+        0: Node(0, 10, 0, initial_energy=0.05),
+        1: Node(1, 20, 0, initial_energy=0.05)
+    }
+    for n in nodes.values():
+        n.is_alive = True
+
+    graph = Graph(nodes)
+    em = EnergyModel()
+    harv = ConstantHarvesting(rate=0.0)  # zero harvest
+
+    lifetime, path, sched = dp_time_augmented_lifetime(
+        nodes=nodes,
+        adj_list=graph.adjacency_list,
+        source=1,
+        base_station_pos=(0, 0),
+        energy_model=em,
+        alive_nodes={0, 1},
+        harvesting_model=harv,
+        max_hops=2
+    )
+
+    assert lifetime == pytest.approx(0.05)
+
+
 if __name__ == "__main__":
     test_dp_lifetime_simple()
     test_dp_lifetime_all_dead_except_source()
     test_dp_lifetime_no_path()
     print("\nAll DP lifetime tests passed!")
+

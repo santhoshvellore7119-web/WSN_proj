@@ -12,7 +12,7 @@ sys.path.append('src')
 
 from simulator import Simulator
 
-SEEDS = [42, 7, 123, 256, 999]
+SEEDS = [42, 7, 123, 256, 999, 101, 202, 303, 404, 505]
 
 NUM_NODES      = 50
 AREA           = 100.0
