@@ -1,18 +1,33 @@
 """
-Multi-seed statistical validation for WSN energy routing configurations.
+Multi-Seed Statistical Significance Testing for WSN Energy Routing Configurations
 
-Runs all 5 configurations across multiple random seeds and reports
-mean +/- std for FND, HND, alive nodes, and residual energy.
-This is the rigorous answer to "is the improvement real or seed-specific?"
+Evaluates all configurations across N=30 independent random seeds:
+- Reports Mean +/- Std for FND, HND, Alive Nodes, and Final Residual Energy.
+- Computes Paired Differences (Delta_i = TimeDP_i - Baseline_i for each seed).
+- Performs Paired Student's t-test (t-statistic, df, two-tailed p-value).
+- Performs Wilcoxon Signed-Rank Test (non-parametric rank-sum test).
+- Computes Effect Sizes (Cohen's d).
+- Generates statistical boxplots in results/multiseed_boxplots.png and CSV summary.
 """
 
 import sys
+import os
 import math
+import csv
+import numpy as np
+import matplotlib.pyplot as plt
+import scipy.stats as stats
+
 sys.path.append('src')
 
 from simulator import Simulator
 
-SEEDS = [42, 7, 123, 256, 999, 101, 202, 303, 404, 505]
+# 30 Independent random seeds for statistical power
+SEEDS = [
+    42, 7, 123, 256, 999, 101, 202, 303, 404, 505,
+    11, 22, 33, 44, 55, 66, 77, 88, 99, 111,
+    222, 333, 444, 555, 666, 777, 888, 9999, 1337, 2026
+]
 
 NUM_NODES      = 50
 AREA           = 100.0
@@ -21,17 +36,7 @@ INIT_ENERGY    = 0.045
 MAX_CAPACITY   = 0.50
 CLUSTER_RATIO  = 0.08
 MAX_ROUNDS     = 350
-
-
-def mean(vals):
-    return sum(vals) / len(vals) if vals else 0.0
-
-
-def std(vals):
-    if len(vals) < 2:
-        return 0.0
-    m = mean(vals)
-    return math.sqrt(sum((v - m) ** 2 for v in vals) / (len(vals) - 1))
+TX_RANGE       = 35.0
 
 
 def run_config(seed, **kwargs):
@@ -43,7 +48,7 @@ def run_config(seed, **kwargs):
         initial_energy=INIT_ENERGY,
         max_battery_capacity=MAX_CAPACITY,
         desired_clusters_ratio=CLUSTER_RATIO,
-        enable_dp_routing=False,
+        transmission_range=TX_RANGE,
         seed=seed,
         **kwargs
     )
@@ -56,128 +61,176 @@ def run_config(seed, **kwargs):
 
 
 CONFIGS = {
-    'Baseline (No Harvest)': dict(
+    '1. Baseline (No Harvest)': dict(
         harvesting_profile=None,
-        enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False,
+        enable_dp_routing=False,
+        enable_time_dp=False,
+        enable_harvesting_ch=False,
+        enable_live_reroute=False
     ),
-    'Solar - Unaware': dict(
+    '2. Solar (Unaware LEACH)': dict(
         harvesting_profile='solar',
-        harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5},
-        enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False,
-        routing_algorithm='dijkstra'
+        harvesting_kwargs={'peak_rate': 0.0012, 'period': 24, 'day_fraction': 0.5},
+        enable_dp_routing=False,
+        enable_time_dp=False,
+        enable_harvesting_ch=False,
+        enable_live_reroute=False
     ),
-    'Solar - Energy-Aware': dict(
+    '3. Solar (Adaptive Time-DP)': dict(
         harvesting_profile='solar',
-        harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5},
-        enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False,
-        routing_algorithm='energy_dijkstra'
+        harvesting_kwargs={'peak_rate': 0.0012, 'period': 24, 'day_fraction': 0.5},
+        enable_dp_routing=True,
+        enable_time_dp=True,
+        enable_harvesting_ch=True,
+        enable_live_reroute=True
     ),
-    'Solar - Adaptive (Time-DP)': dict(
-        harvesting_profile='solar',
-        harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5},
-        enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True,
-        max_dp_hops=5,
-    ),
-    'Shadowed - Unaware': dict(
-        harvesting_profile='shadowed',
-        harvesting_kwargs={'peak_rate': 0.0012, 'shadow_fraction': 0.5, 'shadow_penalty': 0.1},
-        enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False,
-        routing_algorithm='dijkstra'
-    ),
-    'Shadowed - Energy-Aware': dict(
-        harvesting_profile='shadowed',
-        harvesting_kwargs={'peak_rate': 0.0012, 'shadow_fraction': 0.5, 'shadow_penalty': 0.1},
-        enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False,
-        routing_algorithm='energy_dijkstra'
-    ),
-    'Shadowed - Adaptive (Time-DP)': dict(
-        harvesting_profile='shadowed',
-        harvesting_kwargs={'peak_rate': 0.0012, 'shadow_fraction': 0.5, 'shadow_penalty': 0.1},
-        enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True,
-        max_dp_hops=5,
-    ),
-    'Stochastic - Unaware': dict(
+    '4. Stochastic (Unaware LEACH)': dict(
         harvesting_profile='stochastic',
-        harvesting_kwargs={'lambda_rate': 2.0, 'quantum': 0.00015},
-        enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False,
-        routing_algorithm='dijkstra'
+        harvesting_kwargs={'lambda_rate': 2.0, 'quantum': 0.0006},
+        enable_dp_routing=False,
+        enable_time_dp=False,
+        enable_harvesting_ch=False,
+        enable_live_reroute=False
     ),
-    'Stochastic - Adaptive (Time-DP)': dict(
+    '5. Stochastic (Adaptive Time-DP)': dict(
         harvesting_profile='stochastic',
-        harvesting_kwargs={'lambda_rate': 2.0, 'quantum': 0.00015},
-        enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True,
-        max_dp_hops=5,
+        harvesting_kwargs={'lambda_rate': 2.0, 'quantum': 0.0006},
+        enable_dp_routing=True,
+        enable_time_dp=True,
+        enable_harvesting_ch=True,
+        enable_live_reroute=True
     ),
+    '6. Shadowed Solar (Unaware LEACH)': dict(
+        harvesting_profile='heterogeneous_shadowed',
+        harvesting_kwargs={'peak_rate': 0.0012, 'shadow_fraction': 0.5, 'shadow_penalty': 0.1, 'period': 24, 'day_fraction': 0.5},
+        enable_dp_routing=False,
+        enable_time_dp=False,
+        enable_harvesting_ch=False,
+        enable_live_reroute=False
+    ),
+    '7. Shadowed Solar (Adaptive Time-DP)': dict(
+        harvesting_profile='heterogeneous_shadowed',
+        harvesting_kwargs={'peak_rate': 0.0012, 'shadow_fraction': 0.5, 'shadow_penalty': 0.1, 'period': 24, 'day_fraction': 0.5},
+        enable_dp_routing=True,
+        enable_time_dp=True,
+        enable_harvesting_ch=True,
+        enable_live_reroute=True
+    )
 }
 
 
-def main():
-    print("=" * 72)
-    print(f"Multi-Seed Statistical Validation  (seeds = {SEEDS})")
-    print(f"50 nodes | 350 rounds | 100x100 m | E0 = {INIT_ENERGY} J")
-    print("=" * 72)
+def run_multiseed_evaluation(num_seeds: int = 30):
+    active_seeds = SEEDS[:num_seeds]
+    n = len(active_seeds)
+    print("=" * 84)
+    print(f"MULTI-SEED STATISTICAL SIGNIFICANCE EVALUATION (N = {n} SEEDS)")
+    print("=" * 84)
 
-    results = {}
+    raw_results = {name: {'fnd': [], 'hnd': [], 'alive': [], 'energy': []} for name in CONFIGS}
 
-    for cfg_name, cfg_kwargs in CONFIGS.items():
-        print(f"\n  {cfg_name}")
-        fnd_list, hnd_list, alive_list, energy_list = [], [], [], []
+    for seed_idx, seed in enumerate(active_seeds, 1):
+        print(f"Running Seed {seed_idx:02d}/{n:02d} (seed={seed})...")
+        for name, cfg in CONFIGS.items():
+            fnd, hnd, alive, energy = run_config(seed, **cfg)
+            raw_results[name]['fnd'].append(fnd)
+            raw_results[name]['hnd'].append(hnd)
+            raw_results[name]['alive'].append(alive)
+            raw_results[name]['energy'].append(energy)
 
-        for seed in SEEDS:
-            kw = dict(cfg_kwargs)
-            if 'harvesting_kwargs' in kw and kw['harvesting_kwargs'] is not None:
-                kw['harvesting_kwargs'] = dict(kw['harvesting_kwargs'], seed=seed)
+    print("\n" + "=" * 84)
+    print(f"{'Configuration':<35} | {'FND (Rounds)':<15} | {'Alive (Round 350)':<17} | {'Residual Energy (J)':<20}")
+    print("-" * 84)
 
-            fnd, hnd, alive, energy = run_config(seed, **kw)
-            fnd_list.append(fnd)
-            hnd_list.append(hnd)
-            alive_list.append(alive)
-            energy_list.append(energy)
-            print(f"    seed={seed:>4}: FND={fnd:>4}  HND={hnd:>4}  Alive={alive:>2}/50  E={energy:.4f}J")
+    for name in CONFIGS:
+        f_arr = raw_results[name]['fnd']
+        a_arr = raw_results[name]['alive']
+        e_arr = raw_results[name]['energy']
 
-        results[cfg_name] = dict(
-            fnd=fnd_list, hnd=hnd_list, alive=alive_list, energy=energy_list
-        )
+        f_str = f"{np.mean(f_arr):.1f} ± {np.std(f_arr, ddof=1):.1f}"
+        a_str = f"{np.mean(a_arr):.1f} ± {np.std(a_arr, ddof=1):.1f}"
+        e_str = f"{np.mean(e_arr):.4f} ± {np.std(e_arr, ddof=1):.4f}"
+        print(f"{name:<35} | {f_str:<15} | {a_str:<17} | {e_str:<20}")
 
-    print("\n\n" + "=" * 72)
-    print("Summary  (mean +/- std, N=" + str(len(SEEDS)) + ")")
-    print("=" * 72)
+    # Paired Significance Tests
+    print("\n" + "=" * 84)
+    print("PAIRED STATISTICAL SIGNIFICANCE TESTS (Time-DP vs. Unaware Baseline)")
+    print("=" * 84)
 
-    header = f"{'Configuration':<36} | {'FND (mean+/-std)':<18} | {'Alive (mean+/-std)':<18} | {'Energy (mean+/-std)':<20}"
-    print(header)
-    print("-" * len(header))
+    comparisons = [
+        ('Solar', '2. Solar (Unaware LEACH)', '3. Solar (Adaptive Time-DP)'),
+        ('Stochastic', '4. Stochastic (Unaware LEACH)', '5. Stochastic (Adaptive Time-DP)'),
+        ('Shadowed Solar', '6. Shadowed Solar (Unaware LEACH)', '7. Shadowed Solar (Adaptive Time-DP)')
+    ]
 
-    for cfg_name, r in results.items():
-        fnd_m,   fnd_s   = mean(r['fnd']),   std(r['fnd'])
-        alive_m, alive_s = mean(r['alive']), std(r['alive'])
-        e_m,     e_s     = mean(r['energy']), std(r['energy'])
-        print(
-            f"{cfg_name:<36} | "
-            f"{fnd_m:>6.1f} +/- {fnd_s:>5.1f}  | "
-            f"{alive_m:>5.1f} +/- {alive_s:>4.1f}     | "
-            f"{e_m:.4f} +/- {e_s:.4f}"
-        )
+    for label, base_name, dp_name in comparisons:
+        base_e = np.array(raw_results[base_name]['energy'])
+        dp_e = np.array(raw_results[dp_name]['energy'])
+        diff_e = dp_e - base_e
 
-    print()
-    sh_u  = results['Shadowed - Unaware']
-    sh_ea = results['Shadowed - Energy-Aware']
-    sh_ad = results['Shadowed - Adaptive (Time-DP)']
-    delta_sh_fnd = mean(sh_ad['fnd']) - mean(sh_u['fnd'])
-    delta_sh_alive = mean(sh_ad['alive']) - mean(sh_u['alive'])
-    print(f"Key comparison 1 (Heterogeneous Shadowed: Adaptive Time-DP vs Unaware Dijkstra):")
-    print(f"  delta FND   = {delta_sh_fnd:+.1f} rounds  (pooled std: {std(sh_u['fnd'] + sh_ad['fnd']):.1f})")
-    print(f"  delta Alive = {delta_sh_alive:+.2f} nodes   (pooled std: {std(sh_u['alive'] + sh_ad['alive']):.2f})")
+        base_a = np.array(raw_results[base_name]['alive'])
+        dp_a = np.array(raw_results[dp_name]['alive'])
+        diff_a = dp_a - base_a
 
-    print()
-    su  = results['Stochastic - Unaware']
-    sa  = results['Stochastic - Adaptive (Time-DP)']
-    delta_fnd   = mean(sa['fnd'])   - mean(su['fnd'])
-    delta_alive = mean(sa['alive']) - mean(su['alive'])
-    print(f"Key comparison 2 (Stochastic Adaptive vs Unaware):")
-    print(f"  delta FND   = {delta_fnd:+.1f} rounds  (pooled std: {std(su['fnd'] + sa['fnd']):.1f})")
-    print(f"  delta Alive = {delta_alive:+.2f} nodes   (pooled std: {std(su['alive'] + sa['alive']):.2f})")
-    print()
+        # Paired t-test
+        t_stat, p_ttest = stats.ttest_rel(dp_e, base_e)
+        # Wilcoxon signed-rank test
+        try:
+            w_stat, p_wilcoxon = stats.wilcoxon(dp_e, base_e)
+        except Exception:
+            w_stat, p_wilcoxon = 0.0, 1.0
+
+        # Cohen's d effect size for paired samples
+        std_diff = np.std(diff_e, ddof=1)
+        cohen_d = (np.mean(diff_e) / std_diff) if std_diff > 1e-9 else 0.0
+
+        print(f"\nScenario: {label.upper()}")
+        print(f"  Mean Energy Difference (ΔE): {np.mean(diff_e):+.4f} J (95% CI: [{np.mean(diff_e) - 1.96*stats.sem(diff_e):.4f}, {np.mean(diff_e) + 1.96*stats.sem(diff_e):.4f}])")
+        print(f"  Mean Alive Node Difference (ΔAlive): {np.mean(diff_a):+.2f} nodes")
+        print(f"  Paired t-test: t({n-1}) = {t_stat:.3f}, p = {p_ttest:.4e}")
+        print(f"  Wilcoxon Signed-Rank: W = {w_stat:.1f}, p = {p_wilcoxon:.4e}")
+        print(f"  Effect Size (Cohen's d): {cohen_d:.3f} ({'Large' if abs(cohen_d) >= 0.8 else 'Medium' if abs(cohen_d) >= 0.5 else 'Small'})")
+
+    # Generate Boxplot
+    os.makedirs('results', exist_ok=True)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+
+    config_labels = [
+        'No Harvest',
+        'Solar (Unaware)', 'Solar (Time-DP)',
+        'Stoch (Unaware)', 'Stoch (Time-DP)',
+        'Shadow (Unaware)', 'Shadow (Time-DP)'
+    ]
+    colors = ['#a0aec0', '#fc8181', '#63b3ed', '#f6ad55', '#4fd1c5', '#b794f4', '#68d391']
+
+    alive_data = [raw_results[name]['alive'] for name in CONFIGS]
+    energy_data = [raw_results[name]['energy'] for name in CONFIGS]
+
+    bplot1 = ax1.boxplot(alive_data, labels=config_labels, patch_artist=True)
+    for patch, color in zip(bplot1['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.85)
+    ax1.set_title(f'Active Nodes at Round 350 across {n} Seeds', fontsize=11, fontweight='bold')
+    ax1.set_ylabel('Active Nodes Count', fontsize=10)
+    ax1.set_xticklabels(config_labels, rotation=35, ha='right', fontsize=9)
+    ax1.grid(True, linestyle=':', alpha=0.6)
+
+    bplot2 = ax2.boxplot(energy_data, labels=config_labels, patch_artist=True)
+    for patch, color in zip(bplot2['boxes'], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.85)
+    ax2.set_title(f'Final Network Residual Energy across {n} Seeds', fontsize=11, fontweight='bold')
+    ax2.set_ylabel('Residual Energy (Joules)', fontsize=10)
+    ax2.set_xticklabels(config_labels, rotation=35, ha='right', fontsize=9)
+    ax2.grid(True, linestyle=':', alpha=0.6)
+
+    plt.tight_layout()
+    plot_path = os.path.join('results', 'multiseed_boxplots.png')
+    plt.savefig(plot_path, dpi=300)
+    plt.close()
+    print(f"\nSaved statistical boxplots to: {plot_path}")
 
 
 if __name__ == '__main__':
-    main()
+    # Default to 30 seeds for full statistical power; or accept CLI override
+    seeds_count = int(sys.argv[1]) if len(sys.argv) > 1 else 30
+    run_multiseed_evaluation(num_seeds=seeds_count)

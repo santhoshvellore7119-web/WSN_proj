@@ -17,8 +17,7 @@ function App() {
     loading,
     error,
     results,
-    jobId,
-    reset
+    jobId
   } = useSimulation();
 
   const [activeTab, setActiveTab] = useState('results'); // results, network, charts, scrubber, heatmap, benchmark

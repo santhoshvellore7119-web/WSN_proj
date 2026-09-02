@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useSimulation } from '../hooks/useSimulation';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import PropTypes from 'prop-types';
 
 const BenchmarkView = () => {
-  const { runBenchmark, loading, error, results, reset } = useSimulation();
+  const { runBenchmark, loading, error, results } = useSimulation();
   const [benchmarkData, setBenchmarkData] = useState(null);
   const [parsingError, setParsingError] = useState(null);
+
+  const handleReset = () => {
+    setBenchmarkData(null);
+    setParsingError(null);
+  };
 
   const handleRunBenchmark = async () => {
     setParsingError(null);
@@ -59,7 +63,7 @@ const BenchmarkView = () => {
         </div>
         <div className="benchmark-error">
           <p>Error: {error}</p>
-          <button onClick={reset}>Try Again</button>
+          <button onClick={handleReset}>Try Again</button>
         </div>
       </div>
     );
@@ -74,7 +78,7 @@ const BenchmarkView = () => {
         </div>
         <div className="benchmark-error">
           <p>{parsingError}</p>
-          <button onClick={reset}>Try Again</button>
+          <button onClick={handleReset}>Try Again</button>
         </div>
       </div>
     );
@@ -105,7 +109,7 @@ const BenchmarkView = () => {
         <button onClick={handleRunBenchmark}>
           {loading ? 'Running Benchmark...' : 'Run Benchmark'}
         </button>
-        <button onClick={reset} style={{ marginLeft: '10px' }}>
+        <button onClick={handleReset} style={{ marginLeft: '10px' }}>
           Reset
         </button>
       </div>

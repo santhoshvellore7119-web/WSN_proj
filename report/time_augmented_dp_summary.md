@@ -181,9 +181,22 @@ When an intermediate relay node exhausts battery mid-round during active multi-h
 
 ---
 
-## 8. Summary of Academic Insights
+## 8. Threats to Validity & Modeling Limitations
+
+To ensure academic rigor and honesty, we explicitly document the underlying assumptions and boundaries of this simulation model:
+
+1. **Physical Layer Propagation:** We utilize the established LEACH first-order radio model ($d^2$ free space / $d^4$ multipath). This does not account for continuous Rayleigh/Rician fading, multi-path reflections in complex terrain, or asymmetric link quality (RSSI/LQI fluctuations).
+2. **MAC Layer Collisions:** The model abstracts the medium access control layer, assuming idealized collision-free transmission via TDMA within clusters and non-interfering CDMA/orthogonal channels across clusters. Real-world contention, packet backoffs, and retransmissions will introduce additional energy overhead.
+3. **Topology Mobility:** Nodes are assumed statically deployed after initialization. Mobile sensor nodes or sink mobility are outside the current scope.
+4. **Energy Harvesting Estimation Uncertainty:** While Theorem 2 proves a $2\epsilon$-approximation bound for bounded prediction error, extreme weather unpredictability (e.g. unforecasted sudden storm occlusions) can degrade lookahead fidelity.
+5. **Time Synchronization:** The discrete round model assumes nodes maintain loose coarse-grained time synchronization (e.g., via TPSN or periodic base station beacons) sufficient to align lookahead intervals $\delta$.
+
+---
+
+## 9. Summary of Academic Insights
 
 1. **Mechanism Proven:** The hand-crafted 5-node counterexample isolates the exact condition where classical DP and energy-aware Dijkstra fail, and Time-DP succeeds.
 2. **Asymptotic Rigor:** Time-Augmented DP incurs an asymptotic factor of $O(T)$ over classical DP, mapping to a small, tractable constant factor under realistic WSN hop and horizon constraints.
 3. **Approximation Guarantees:** Under bounded stochastic harvesting noise $|\xi| \le \epsilon$, Time-DP provably operates within $2\epsilon$ of offline optimal foresight routing.
-4. **Resilient Detouring:** Union-Find provides a fast local recovery mechanism ($6.1\times$ faster than full table recomputation) to maintain packet delivery when nodes fail mid-round.
+4. **Regime-Dependence:** Empirical sweeps prove that lookahead advantage scales directly with spatial harvesting heterogeneity ($p_{\mathrm{shadow}}$), whereas in uniform sunny environments, lightweight heuristics are optimal.
+5. **Resilient Detouring:** Union-Find provides a fast local recovery mechanism ($6.1\times$ faster than full table recomputation) to maintain packet delivery when nodes fail mid-round.

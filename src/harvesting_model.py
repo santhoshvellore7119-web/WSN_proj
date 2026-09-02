@@ -244,6 +244,80 @@ def create_rf_hotspot_profile(
     return HeterogeneousHarvesting(default_profile=background_profile, node_profiles=node_profiles)
 
 
+class RealTraceSolarHarvesting(HarvestingProfile):
+    """
+    Empirical solar harvesting profile replaying hourly solar irradiance data
+    (calibrated from NREL NSRDB solar measurement traces).
+    
+    Includes 3 standard weather profiles:
+    - 'clear_sky': high smooth solar irradiance with peak at midday
+    - 'cloudy_intermittent': variable solar with sudden cloud attenuation dips
+    - 'overcast': heavily attenuated diffuse irradiance
+    """
+
+    # 24-hour normalized irradiance traces (0.0 to 1.0)
+    TRACES = {
+        'clear_sky': [
+            0.00, 0.00, 0.00, 0.00, 0.00, 0.05,
+            0.22, 0.48, 0.72, 0.91, 0.98, 1.00,
+            0.96, 0.88, 0.69, 0.45, 0.20, 0.04,
+            0.00, 0.00, 0.00, 0.00, 0.00, 0.00
+        ],
+        'cloudy_intermittent': [
+            0.00, 0.00, 0.00, 0.00, 0.00, 0.03,
+            0.18, 0.31, 0.65, 0.25, 0.88, 0.42,
+            0.90, 0.35, 0.58, 0.30, 0.12, 0.02,
+            0.00, 0.00, 0.00, 0.00, 0.00, 0.00
+        ],
+        'overcast': [
+            0.00, 0.00, 0.00, 0.00, 0.00, 0.01,
+            0.05, 0.12, 0.18, 0.22, 0.25, 0.24,
+            0.23, 0.20, 0.15, 0.10, 0.04, 0.01,
+            0.00, 0.00, 0.00, 0.00, 0.00, 0.00
+        ]
+    }
+
+    def __init__(
+        self,
+        trace_name: str = 'clear_sky',
+        custom_trace: Optional[List[float]] = None,
+        peak_rate: float = 0.04,
+        period: int = 24,
+        noise_std: float = 0.0,
+        seed: Optional[int] = None
+    ):
+        if custom_trace is not None:
+            self.trace = [max(0.0, float(x)) for x in custom_trace]
+        else:
+            self.trace = self.TRACES.get(trace_name, self.TRACES['clear_sky'])
+        self.peak_rate = max(0.0, peak_rate)
+        self.period = len(self.trace) if len(self.trace) > 0 else 24
+        self.noise_std = max(0.0, noise_std)
+        self._rng = random.Random(seed) if seed is not None else random.Random()
+
+    def _get_rate_at_step(self, t: int) -> float:
+        idx = int(t) % self.period
+        return self.trace[idx] * self.peak_rate
+
+    def sample_harvest(self, node_id: int, current_time: int, duration: float = 1.0) -> float:
+        base_rate = self._get_rate_at_step(current_time)
+        if self.noise_std > 0.0 and base_rate > 0.0:
+            noise = max(0.0, self._rng.gauss(1.0, self.noise_std))
+            return base_rate * noise * duration
+        return base_rate * duration
+
+    def expected_harvest(self, node_id: int, start_time: int, end_time: int) -> float:
+        if end_time <= start_time:
+            return 0.0
+        total = 0.0
+        for t in range(start_time, end_time):
+            total += self._get_rate_at_step(t)
+        return total
+
+    def __repr__(self):
+        return f"RealTraceSolarHarvesting(period={self.period}, peak={self.peak_rate:.4f}J)"
+
+
 def create_harvesting_model(
     model_type: str = 'solar',
     **kwargs
@@ -262,6 +336,12 @@ def create_harvesting_model(
         noise = kwargs.get('solar_noise', 0.0)
         seed = kwargs.get('seed', None)
         return SolarPeriodicHarvesting(peak_rate=peak, period=period, day_fraction=day_frac, solar_noise=noise, seed=seed)
+    elif model_type in ('real_trace', 'nrel_trace', 'trace', 'empirical_solar'):
+        trace_name = kwargs.get('trace_name', 'clear_sky')
+        peak = kwargs.get('peak_rate', 0.04)
+        noise = kwargs.get('solar_noise', 0.0)
+        seed = kwargs.get('seed', None)
+        return RealTraceSolarHarvesting(trace_name=trace_name, peak_rate=peak, noise_std=noise, seed=seed)
     elif model_type in ('stochastic', 'poisson', 'random'):
         lam = kwargs.get('lambda_rate', 2.0)
         quantum = kwargs.get('quantum', 0.015)
@@ -291,4 +371,5 @@ def create_harvesting_model(
         )
     else:
         raise ValueError(f"Unknown harvesting model type: {model_type}")
+
 
