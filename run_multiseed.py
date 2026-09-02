@@ -146,9 +146,9 @@ def run_multiseed_evaluation(num_seeds: int = 30):
         a_arr = raw_results[name]['alive']
         e_arr = raw_results[name]['energy']
 
-        f_str = f"{np.mean(f_arr):.1f} ± {np.std(f_arr, ddof=1):.1f}"
-        a_str = f"{np.mean(a_arr):.1f} ± {np.std(a_arr, ddof=1):.1f}"
-        e_str = f"{np.mean(e_arr):.4f} ± {np.std(e_arr, ddof=1):.4f}"
+        f_str = f"{np.mean(f_arr):.1f} +/- {np.std(f_arr, ddof=1):.1f}"
+        a_str = f"{np.mean(a_arr):.1f} +/- {np.std(a_arr, ddof=1):.1f}"
+        e_str = f"{np.mean(e_arr):.4f} +/- {np.std(e_arr, ddof=1):.4f}"
         print(f"{name:<35} | {f_str:<15} | {a_str:<17} | {e_str:<20}")
 
     # Paired Significance Tests
@@ -183,9 +183,12 @@ def run_multiseed_evaluation(num_seeds: int = 30):
         std_diff = np.std(diff_e, ddof=1)
         cohen_d = (np.mean(diff_e) / std_diff) if std_diff > 1e-9 else 0.0
 
+        ci_low = np.mean(diff_e) - 1.96 * stats.sem(diff_e) if len(diff_e) > 1 else 0.0
+        ci_high = np.mean(diff_e) + 1.96 * stats.sem(diff_e) if len(diff_e) > 1 else 0.0
+
         print(f"\nScenario: {label.upper()}")
-        print(f"  Mean Energy Difference (ΔE): {np.mean(diff_e):+.4f} J (95% CI: [{np.mean(diff_e) - 1.96*stats.sem(diff_e):.4f}, {np.mean(diff_e) + 1.96*stats.sem(diff_e):.4f}])")
-        print(f"  Mean Alive Node Difference (ΔAlive): {np.mean(diff_a):+.2f} nodes")
+        print(f"  Mean Energy Difference (Delta_E): {np.mean(diff_e):+.4f} J (95% CI: [{ci_low:.4f}, {ci_high:.4f}])")
+        print(f"  Mean Alive Node Difference (Delta_Alive): {np.mean(diff_a):+.2f} nodes")
         print(f"  Paired t-test: t({n-1}) = {t_stat:.3f}, p = {p_ttest:.4e}")
         print(f"  Wilcoxon Signed-Rank: W = {w_stat:.1f}, p = {p_wilcoxon:.4e}")
         print(f"  Effect Size (Cohen's d): {cohen_d:.3f} ({'Large' if abs(cohen_d) >= 0.8 else 'Medium' if abs(cohen_d) >= 0.5 else 'Small'})")
@@ -205,21 +208,23 @@ def run_multiseed_evaluation(num_seeds: int = 30):
     alive_data = [raw_results[name]['alive'] for name in CONFIGS]
     energy_data = [raw_results[name]['energy'] for name in CONFIGS]
 
-    bplot1 = ax1.boxplot(alive_data, labels=config_labels, patch_artist=True)
+    bplot1 = ax1.boxplot(alive_data, patch_artist=True)
     for patch, color in zip(bplot1['boxes'], colors):
         patch.set_facecolor(color)
         patch.set_alpha(0.85)
     ax1.set_title(f'Active Nodes at Round 350 across {n} Seeds', fontsize=11, fontweight='bold')
     ax1.set_ylabel('Active Nodes Count', fontsize=10)
+    ax1.set_xticks(range(1, len(config_labels) + 1))
     ax1.set_xticklabels(config_labels, rotation=35, ha='right', fontsize=9)
     ax1.grid(True, linestyle=':', alpha=0.6)
 
-    bplot2 = ax2.boxplot(energy_data, labels=config_labels, patch_artist=True)
+    bplot2 = ax2.boxplot(energy_data, patch_artist=True)
     for patch, color in zip(bplot2['boxes'], colors):
         patch.set_facecolor(color)
         patch.set_alpha(0.85)
     ax2.set_title(f'Final Network Residual Energy across {n} Seeds', fontsize=11, fontweight='bold')
     ax2.set_ylabel('Residual Energy (Joules)', fontsize=10)
+    ax2.set_xticks(range(1, len(config_labels) + 1))
     ax2.set_xticklabels(config_labels, rotation=35, ha='right', fontsize=9)
     ax2.grid(True, linestyle=':', alpha=0.6)
 
