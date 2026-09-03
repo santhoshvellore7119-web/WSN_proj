@@ -257,14 +257,23 @@ def dp_time_augmented_lifetime(
                     for v, _ in adj_list[u]:
                         if v not in alive_nodes or v == source:
                             continue
-                        if transmission_range is not None:
-                            dist_uv = ((nodes[u].x - nodes[v].x)**2 + (nodes[u].y - nodes[v].y)**2)**0.5
-                            if dist_uv > transmission_range:
-                                continue
-                        e_proj_v = get_projected_energy(v, t)
-                        if e_proj_v <= 0.0:
+                        dist_uv = ((nodes[u].x - nodes[v].x)**2 + (nodes[u].y - nodes[v].y)**2)**0.5
+                        if transmission_range is not None and dist_uv > transmission_range:
                             continue
-                        candidate_val = min(bottleneck_u, e_proj_v)
+
+                        # Physical energy check: u must afford transmission, v must afford reception
+                        tx_cost_uv = energy_model.transmit_energy(k_bits, dist_uv)
+                        rx_cost_v = energy_model.receive_energy(k_bits)
+                        if bottleneck_u <= tx_cost_uv:
+                            continue
+
+                        e_proj_v = get_projected_energy(v, t)
+                        avail_v = e_proj_v - rx_cost_v
+                        # Relay v must have sufficient residual reserve to avoid immediate exhaustion
+                        if avail_v <= rx_cost_v * 0.5:
+                            continue
+
+                        candidate_val = min(bottleneck_u, avail_v)
                         candidate_cost = dp_cost[u][h - 1][prev_t] + edge_transmission_cost(u, v)
                         update_dp(v, h, t, candidate_val, candidate_cost, u, prev_t)
 

@@ -77,7 +77,7 @@ def leach_clustering(
     for nid, prob in node_probabilities.items():
         rand_val = _draw()
         if rand_val < prob:
-            heapq.heappush(candidates, (rand_val, -effective_energies[nid], nid))
+            heapq.heappush(candidates, (-effective_energies[nid], rand_val, nid))
 
     # 4. Pick up to desired number of cluster heads
     selected_ch = []

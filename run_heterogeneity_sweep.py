@@ -183,7 +183,7 @@ def run_heterogeneity_experiment():
     print(f"Saved heterogeneity sweep plot to: {plot_path}")
 
     print("\n" + "=" * 78)
-    print("HETEROGENEITY EXPERIMENT COMPLETE: HYPOTHESIS CONFIRMED")
+    print("HETEROGENEITY EXPERIMENT COMPLETE: DATA AND PLOTS SAVED TO results/")
     print("=" * 78)
 
 

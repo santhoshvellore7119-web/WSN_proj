@@ -138,19 +138,19 @@ We conducted parameter sweeps across time horizon $T \in [1, 18]$ and hop limit 
 
 ## 6. Comprehensive Empirical Evaluation (9 Benchmark Scenarios)
 
-### Benchmark 1: Canonical Single-Seed Benchmark (Seed 42, 50 Nodes, 350 Rounds)
+### Benchmark 1: Canonical Single-Seed Benchmark (Seed 42, 50 Nodes, 350 Rounds, $R_{\text{tx}} = 35.0\text{m}$)
 
 | Configuration | First Node Death (FND) | Half Nodes Dead (HND) | Alive Nodes (Round 350) | Total Residual Energy |
 | :--- | :--- | :--- | :--- | :--- |
-| **1. Baseline (No Harvesting)** | Round 82 | Round 112 | 0 / 50 | 0.0000 J |
-| **2. Solar (Unaware Dijkstra)** | Round 165 | Round 209 | 0 / 50 | 0.0000 J |
-| **3. Solar (Energy-Aware Dijkstra)** | Round 165 | Round 209 | 0 / 50 | 0.0000 J |
-| **4. Solar (Adaptive Time-DP)** | Round 165 | Round 208 | 0 / 50 | 0.0000 J |
-| **5. Shadowed (Unaware Dijkstra)** | Round 108 | $> 350$ | 27 / 50 | 0.8142 J |
-| **6. Shadowed (Energy-Aware Dijkstra)** | Round 108 | $> 350$ | 27 / 50 | 0.8142 J |
-| **7. Shadowed (Adaptive Time-DP)** | **Round 109** | $> 350$ | **27 / 50** | 0.7995 J |
-| **8. Stochastic (Unaware Dijkstra)** | Round 320 | $> 350$ | 40 / 50 | 0.2581 J |
-| **9. Stochastic (Adaptive Time-DP)** | **Round 329** | $> 350$ | **41 / 50** | 0.2532 J |
+| **1. Baseline (No Harvesting)** | Round 92 | Round 108 | 0 / 50 | 0.0000 J |
+| **2. Solar (Unaware Dijkstra)** | Round 182 | Round 205 | 0 / 50 | 0.0000 J |
+| **3. Solar (Energy-Aware Dijkstra)** | Round 183 | Round 206 | 0 / 50 | 0.0000 J |
+| **4. Solar (Adaptive Time-DP)** | Round 151 | Round 194 | **1 / 50** | **0.0276 J** |
+| **5. Shadowed (Unaware Dijkstra)** | Round 112 | $> 350$ | 27 / 50 | 0.6630 J |
+| **6. Shadowed (Energy-Aware Dijkstra)** | Round 112 | $> 350$ | 27 / 50 | 0.6467 J |
+| **7. Shadowed (Adaptive Time-DP)** | Round 107 | $> 350$ | 27 / 50 | 0.5930 J |
+| **8. Stochastic (Unaware Dijkstra)** | Round 302 | $> 350$ | 36 / 50 | 0.0963 J |
+| **9. Stochastic (Adaptive Time-DP)** | Round 302 | $> 350$ | 26 / 50 | 0.0479 J |
 
 ---
 

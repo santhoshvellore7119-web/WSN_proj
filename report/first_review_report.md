@@ -69,19 +69,23 @@ All **46 unit tests** pass with `pytest` in $< 2.5\text{s}$, verifying:
 - Literature baselines: EH-LEACH election and RealTrace solar sampling.
 - FastAPI backend routes (`/health`, `/simulate`, `/benchmark`, `/jobs/{id}`) via `TestClient`.
 
-### 3.2 Canonical Benchmark (50 Nodes, 350 Rounds, Seed 42)
+### 3.2 Canonical Benchmark (50 Nodes, 350 Rounds, $R_{\text{tx}} = 35.0\text{m}$, Seed 42)
 
 | Configuration | First Node Death (FND) | Half Nodes Dead (HND) | Alive (Round 350) | Residual Energy (J) |
 | :--- | :--- | :--- | :--- | :--- |
-| **1. Baseline (No Harvesting)** | Round 78 | Round 109 | 0 / 50 | 0.0000 J |
-| **2. Solar (Unaware LEACH + Dijkstra)** | Round 135 | Round 208 | 1 / 50 | 0.0197 J |
-| **3. Solar (Adaptive Time-DP)** | Round 167 | Round 208 | 0 / 50 | 0.0000 J |
-| **4. Stochastic Poisson (Unaware LEACH)** | Round 300 | $> 350$ | 42 / 50 | 0.2224 J |
-| **5. Stochastic Poisson (Adaptive Time-DP)** | Round 301 | $> 350$ | **44 / 50** | **0.2296 J** |
+| **1. Baseline (No Harvesting)** | Round 92 | Round 108 | 0 / 50 | 0.0000 J |
+| **2. Solar (Unaware LEACH + Dijkstra)** | Round 182 | Round 205 | 0 / 50 | 0.0000 J |
+| **3. Solar (Adaptive Time-DP)** | Round 151 | Round 194 | **1 / 50** | **0.0276 J** |
+| **4. Shadowed (Unaware Dijkstra)** | Round 112 | $> 350$ | 27 / 50 | 0.6630 J |
+| **5. Shadowed (Adaptive Time-DP)** | Round 107 | $> 350$ | 27 / 50 | 0.5930 J |
+| **6. Stochastic Poisson (Unaware LEACH)** | Round 302 | $> 350$ | 36 / 50 | 0.0963 J |
+| **7. Stochastic Poisson (Adaptive Time-DP)** | Round 302 | $> 350$ | 26 / 50 | 0.0479 J |
 
 ### 3.3 Harvesting Heterogeneity Sweep ($p_{\text{shadow}} \in [0.0, 1.0]$)
-- **Falsifiable Hypothesis Confirmed:** Under uniform solar irradiance ($p_{\text{shadow}} = 0.0$), all nodes harvest at identical rates, meaning Time-DP matches energy-aware heuristics.
-- When spatial heterogeneity is introduced ($p_{\text{shadow}} \ge 0.4$), occluded nodes deplete rapidly under unaware routing. Time-Augmented DP actively identifies unoccluded recharging nodes to sustain multi-hop delivery.
+- **Empirical Findings & Trade-Off Analysis:**
+  - In low-to-moderate spatial occlusion ($p_{\text{shadow}} \le 0.8$), multi-hop relaying introduces an unavoidable reception dissipation penalty ($E_{\text{rx}} = k \cdot E_{\text{elec}}$) on intermediate relays. Direct-to-sink transmission minimizes aggregate reception energy when nodes can reach the base station.
+  - In extreme occlusion ($p_{\text{shadow}} = 1.0$), where all active relays suffer heavy solar deprivation, Time-Augmented DP's lookahead routing actively protects vulnerable forwarders, extending network operational lifetime by **+6 rounds** (FND 102 vs 96) and preserving greater residual energy (+1.2% gain, $0.0866\text{ J}$ vs $0.0855\text{ J}$).
+  - In diurnal solar environments, Adaptive Time-DP preserves viable nodes into the late game (sustaining 1 alive node at Round 350 with $0.0276\text{ J}$ compared to complete network exhaustion in standard Dijkstra).
 
 ### 3.4 Scalability Benchmark ($N = 50 \to 500$ Nodes)
 Empirical latency scaling measurements confirm theoretical asymptotic complexity:
@@ -94,11 +98,12 @@ Empirical latency scaling measurements confirm theoretical asymptotic complexity
 
 ## 4. Modeling Assumptions & Threats to Validity
 
-To ensure scientific honesty and rigor, the boundaries of the simulation are explicitly identified:
-1. **Radio Model:** Uses first-order radio equations ($d^2 / d^4$) without log-normal shadow fading or continuous Rayleigh reflections.
-2. **MAC Layer:** Assumes an idealized collision-free TDMA schedule within clusters and non-interfering orthogonal CDMA channels across clusters.
-3. **Mobility:** Sensor nodes and the sink are statically deployed.
-4. **Time Synchronization:** Assumes loose coarse-grained round synchronization sufficient for discrete lookahead intervals $\delta$.
+To ensure scientific honesty and rigor, the boundaries and physical trade-offs of the simulation are explicitly identified:
+1. **Radio Model & Relay Reception Overhead:** First-order radio equations ($d^2 / d^4$) impose $E_{\text{rx}} = k \cdot E_{\text{elec}}$ on every intermediate relay. Multi-hop routing through harvesting bridges is advantageous only when the energy harvested by the relay or the distance savings from multipath ($d^4 \to d^2$) outweigh the cumulative $E_{\text{rx}}$ reception cost.
+2. **Timescale Discrepancy:** Ambient solar harvesting operates over diurnal cycles (hours), whereas packet propagation across hops occurs on millisecond scales. Lookahead routing assumes discrete scheduling epochs or delay-tolerant buffering between rounds.
+3. **MAC Layer:** Assumes an idealized collision-free TDMA schedule within clusters and non-interfering orthogonal CDMA channels across clusters.
+4. **Mobility:** Sensor nodes and the sink are statically deployed.
+5. **Time Synchronization:** Assumes loose coarse-grained round synchronization sufficient for discrete lookahead intervals $\delta$.
 
 ---
 

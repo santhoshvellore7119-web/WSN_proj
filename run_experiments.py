@@ -33,6 +33,7 @@ def run_all_experiments():
     max_capacity = 0.50
     cluster_ratio = 0.08
     max_rounds = 350
+    tx_range = 35.0
     seed = 42
 
     # 1. Baseline: No Energy Harvesting
@@ -43,7 +44,7 @@ def run_all_experiments():
         max_battery_capacity=max_capacity, desired_clusters_ratio=cluster_ratio,
         enable_dp_routing=False, enable_time_dp=False,
         enable_harvesting_ch=False, enable_live_reroute=False,
-        harvesting_profile=None, seed=seed
+        harvesting_profile=None, transmission_range=tx_range, seed=seed
     )
     sim_baseline.run(max_rounds=max_rounds, verbose=False)
     print(f"  Done: FND={sim_baseline.first_node_death_round}, HND={sim_baseline.half_nodes_dead_round}, Alive={sim_baseline.alive_nodes_history[-1]}/{num_nodes}")
@@ -58,7 +59,7 @@ def run_all_experiments():
         enable_harvesting_ch=False, enable_live_reroute=False,
         harvesting_profile='solar',
         harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5, 'seed': seed},
-        routing_algorithm='dijkstra', seed=seed
+        routing_algorithm='dijkstra', transmission_range=tx_range, seed=seed
     )
     sim_solar_unaware.run(max_rounds=max_rounds, verbose=False)
     print(f"  Done: FND={sim_solar_unaware.first_node_death_round}, HND={sim_solar_unaware.half_nodes_dead_round}, Alive={sim_solar_unaware.alive_nodes_history[-1]}/{num_nodes}")
@@ -73,7 +74,7 @@ def run_all_experiments():
         enable_harvesting_ch=False, enable_live_reroute=False,
         harvesting_profile='solar',
         harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5, 'seed': seed},
-        routing_algorithm='energy_dijkstra', seed=seed
+        routing_algorithm='energy_dijkstra', transmission_range=tx_range, seed=seed
     )
     sim_solar_energy_dijk.run(max_rounds=max_rounds, verbose=False)
     print(f"  Done: FND={sim_solar_energy_dijk.first_node_death_round}, HND={sim_solar_energy_dijk.half_nodes_dead_round}, Alive={sim_solar_energy_dijk.alive_nodes_history[-1]}/{num_nodes}")
@@ -84,11 +85,11 @@ def run_all_experiments():
         num_nodes=num_nodes, area_width=area, area_height=area,
         base_station_pos=bs_pos, initial_energy=init_energy,
         max_battery_capacity=max_capacity, desired_clusters_ratio=cluster_ratio,
-        enable_dp_routing=False, enable_time_dp=True,
+        enable_dp_routing=True, enable_time_dp=True,
         enable_harvesting_ch=True, enable_live_reroute=True,
         harvesting_profile='solar',
         harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5, 'seed': seed},
-        max_dp_hops=5, seed=seed
+        max_dp_hops=5, transmission_range=tx_range, seed=seed
     )
     sim_solar_adaptive.run(max_rounds=max_rounds, verbose=False)
     print(f"  Done: FND={sim_solar_adaptive.first_node_death_round}, HND={sim_solar_adaptive.half_nodes_dead_round}, Alive={sim_solar_adaptive.alive_nodes_history[-1]}/{num_nodes}")
@@ -103,7 +104,7 @@ def run_all_experiments():
         enable_harvesting_ch=False, enable_live_reroute=False,
         harvesting_profile='shadowed',
         harvesting_kwargs={'peak_rate': 0.0012, 'shadow_fraction': 0.5, 'shadow_penalty': 0.1, 'seed': seed},
-        routing_algorithm='dijkstra', seed=seed
+        routing_algorithm='dijkstra', transmission_range=tx_range, seed=seed
     )
     sim_shadow_unaware.run(max_rounds=max_rounds, verbose=False)
     print(f"  Done: FND={sim_shadow_unaware.first_node_death_round}, HND={sim_shadow_unaware.half_nodes_dead_round}, Alive={sim_shadow_unaware.alive_nodes_history[-1]}/{num_nodes}")
@@ -118,7 +119,7 @@ def run_all_experiments():
         enable_harvesting_ch=False, enable_live_reroute=False,
         harvesting_profile='shadowed',
         harvesting_kwargs={'peak_rate': 0.0012, 'shadow_fraction': 0.5, 'shadow_penalty': 0.1, 'seed': seed},
-        routing_algorithm='energy_dijkstra', seed=seed
+        routing_algorithm='energy_dijkstra', transmission_range=tx_range, seed=seed
     )
     sim_shadow_energy_dijk.run(max_rounds=max_rounds, verbose=False)
     print(f"  Done: FND={sim_shadow_energy_dijk.first_node_death_round}, HND={sim_shadow_energy_dijk.half_nodes_dead_round}, Alive={sim_shadow_energy_dijk.alive_nodes_history[-1]}/{num_nodes}")
@@ -129,11 +130,11 @@ def run_all_experiments():
         num_nodes=num_nodes, area_width=area, area_height=area,
         base_station_pos=bs_pos, initial_energy=init_energy,
         max_battery_capacity=max_capacity, desired_clusters_ratio=cluster_ratio,
-        enable_dp_routing=False, enable_time_dp=True,
+        enable_dp_routing=True, enable_time_dp=True,
         enable_harvesting_ch=True, enable_live_reroute=True,
         harvesting_profile='shadowed',
         harvesting_kwargs={'peak_rate': 0.0012, 'shadow_fraction': 0.5, 'shadow_penalty': 0.1, 'seed': seed},
-        max_dp_hops=5, seed=seed
+        max_dp_hops=5, transmission_range=tx_range, seed=seed
     )
     sim_shadow_adaptive.run(max_rounds=max_rounds, verbose=False)
     print(f"  Done: FND={sim_shadow_adaptive.first_node_death_round}, HND={sim_shadow_adaptive.half_nodes_dead_round}, Alive={sim_shadow_adaptive.alive_nodes_history[-1]}/{num_nodes}")
@@ -148,7 +149,7 @@ def run_all_experiments():
         enable_harvesting_ch=False, enable_live_reroute=False,
         harvesting_profile='stochastic',
         harvesting_kwargs={'lambda_rate': 2.0, 'quantum': 0.00015, 'seed': seed},
-        routing_algorithm='dijkstra', seed=seed
+        routing_algorithm='dijkstra', transmission_range=tx_range, seed=seed
     )
     sim_stoch_unaware.run(max_rounds=max_rounds, verbose=False)
     print(f"  Done: FND={sim_stoch_unaware.first_node_death_round}, HND={sim_stoch_unaware.half_nodes_dead_round}, Alive={sim_stoch_unaware.alive_nodes_history[-1]}/{num_nodes}")
@@ -159,11 +160,11 @@ def run_all_experiments():
         num_nodes=num_nodes, area_width=area, area_height=area,
         base_station_pos=bs_pos, initial_energy=init_energy,
         max_battery_capacity=max_capacity, desired_clusters_ratio=cluster_ratio,
-        enable_dp_routing=False, enable_time_dp=True,
+        enable_dp_routing=True, enable_time_dp=True,
         enable_harvesting_ch=True, enable_live_reroute=True,
         harvesting_profile='stochastic',
         harvesting_kwargs={'lambda_rate': 2.0, 'quantum': 0.00015, 'seed': seed},
-        max_dp_hops=5, seed=seed
+        max_dp_hops=5, transmission_range=tx_range, seed=seed
     )
     sim_stoch_adaptive.run(max_rounds=max_rounds, verbose=False)
     print(f"  Done: FND={sim_stoch_adaptive.first_node_death_round}, HND={sim_stoch_adaptive.half_nodes_dead_round}, Alive={sim_stoch_adaptive.alive_nodes_history[-1]}/{num_nodes}")

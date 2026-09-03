@@ -313,7 +313,7 @@ export function dpTimeAugmentedLifetime(
           const rxCost = energyModel.receiveEnergy(kBits);
           const availableRelay = projectedV - rxCost;
 
-          if (availableRelay <= 0 || prevState.bottleneck < txCost) continue;
+          if (availableRelay <= rxCost * 0.5 || prevState.bottleneck <= txCost) continue;
 
           const bottleneck = Math.min(prevState.bottleneck - txCost, availableRelay);
           if (bottleneck > maxBottleneck) {
