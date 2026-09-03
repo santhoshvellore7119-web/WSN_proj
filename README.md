@@ -69,22 +69,21 @@ When an intermediate relay exhausts battery mid-round during active forwarding:
 
 ## 📊 Experimental Results & Benchmarks
 
-### 1. Multi-Seed Statistical Evaluation ($N = 10 \to 30$ Random Seeds)
+### 1. Multi-Seed Statistical Evaluation ($N = 5$ Seeds, 350 Rounds)
 
-| Configuration | First Node Death (FND) | Half Nodes Dead (HND) | Alive Nodes (Round 350) | Total Residual Energy |
-| :--- | :--- | :--- | :--- | :--- |
-| **1. Baseline (No Harvesting)** | $82.2 \pm 5.1$ | $109.7 \pm 1.2$ | $0.0 \pm 0.0$ | $0.0000 \pm 0.0000\text{ J}$ |
-| **2. Solar (Unaware LEACH)** | $155.4 \pm 10.3$ | $205.8 \pm 4.8$ | $0.4 \pm 0.5$ | $0.0071 \pm 0.0090\text{ J}$ |
-| **3. Solar (Adaptive Time-DP)** | $154.9 \pm 10.7$ | $205.8 \pm 4.8$ | $0.4 \pm 0.5$ | $0.0071 \pm 0.0090\text{ J}$ |
-| **4. Shadowed Solar (Unaware)** | $105.0 \pm 4.7$ | $> 350$ | $23.8 \pm 3.1$ | $0.5026 \pm 0.2325\text{ J}$ |
-| **5. Shadowed Solar (Time-DP)** | **$105.4 \pm 5.0$** | $> 350$ | **$23.8 \pm 3.1$** | $0.4994 \pm 0.2317\text{ J}$ |
-| **6. Stochastic (Unaware LEACH)**| $280.2 \pm 32.4$ | $> 350$ | $38.8 \pm 3.3$ | $0.1998 \pm 0.0596\text{ J}$ |
-| **7. Stochastic (Adaptive Time-DP)**| **$280.9 \pm 41.2$** | $> 350$ | **$38.1 \pm 3.9$** | **$0.2004 \pm 0.0616\text{ J}$** |
+| Configuration | First Node Death (FND) | Alive Nodes (Round 350) | Total Residual Energy |
+| :--- | :--- | :--- | :--- |
+| **1. Baseline (No Harvesting)** | $89.4 \pm 3.6$ | $0.4 \pm 0.5$ | $0.0002 \pm 0.0003\text{ J}$ |
+| **2. Solar (Unaware LEACH)** | $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | **$1.7131 \pm 0.0689\text{ J}$** |
+| **3. Solar (Adaptive Time-DP)** | $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | $1.6266 \pm 0.0811\text{ J}$ |
+| **4. Shadowed Solar (Unaware)** | **$107.8 \pm 7.3$** | **$23.6 \pm 3.4$** | **$0.3638 \pm 0.2138\text{ J}$** |
+| **5. Shadowed Solar (Time-DP)** | $105.4 \pm 4.0$ | $23.0 \pm 4.0$ | $0.3220 \pm 0.1987\text{ J}$ |
+| **6. Stochastic (Unaware LEACH)**| $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | **$15.8640 \pm 0.0990\text{ J}$** |
+| **7. Stochastic (Adaptive Time-DP)**| $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | $15.8545 \pm 0.1823\text{ J}$ |
 
-### 2. Heterogeneity Sweep & Regime-Dependence
-- **Hypothesis:** *Time-DP's lookahead margin scales with spatial harvesting heterogeneity.*
-- In homogeneous sunny environments ($p_{\text{shadow}} = 0.0$), all nodes harvest identically and lightweight heuristics suffice.
-- Under spatial occlusion ($p_{\text{shadow}} \ge 0.4$), Time-Augmented DP routes around shadowed clusters by identifying recharging energy bridges.
+### 2. Theoretical vs. Network-Level Trade-Offs
+- **Single-Path Maximin Optimality (Theorem 1):** Proves Bellman optimality on time-expanded DAGs for worst-case bottleneck capacity, isolating recharging relays on targeted paths (5-node counterexample).
+- **The Relay Dissipation Trade-Off ($E_{\text{rx}}$):** In dense uncoordinated networks, multi-hop routing incurs reception energy dissipation ($E_{\text{rx}} = k \cdot E_{\text{elec}}$) on intermediate relays. Shortest-path Dijkstra preserves more aggregate network energy unless extreme spatial occlusion ($p_{\text{shadow}} = 1.0$) forces lookahead detour routing (+6 rounds FND).
 
 ---
 

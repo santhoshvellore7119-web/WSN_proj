@@ -85,9 +85,16 @@ All **46 unit tests** pass with `pytest` in $< 2.5\text{s}$, verifying:
 - **Empirical Findings & Trade-Off Analysis:**
   - In low-to-moderate spatial occlusion ($p_{\text{shadow}} \le 0.8$), multi-hop relaying introduces an unavoidable reception dissipation penalty ($E_{\text{rx}} = k \cdot E_{\text{elec}}$) on intermediate relays. Direct-to-sink transmission minimizes aggregate reception energy when nodes can reach the base station.
   - In extreme occlusion ($p_{\text{shadow}} = 1.0$), where all active relays suffer heavy solar deprivation, Time-Augmented DP's lookahead routing actively protects vulnerable forwarders, extending network operational lifetime by **+6 rounds** (FND 102 vs 96) and preserving greater residual energy (+1.2% gain, $0.0866\text{ J}$ vs $0.0855\text{ J}$).
-  - In diurnal solar environments, Adaptive Time-DP preserves viable nodes into the late game (sustaining 1 alive node at Round 350 with $0.0276\text{ J}$ compared to complete network exhaustion in standard Dijkstra).
+- **Stochastic Regime Regression (36 vs 26 Alive Nodes):** In stochastic Poisson harvesting ($\lambda = 2.0, q = 0.00015\text{ J}$), discrete arrival bursts cause realized harvest to periodically fall short of expected projections. Relays accepting forwarding tasks under optimistic lookahead projections deplete prematurely, leaving 26 surviving nodes compared to 36 under static shortest-path Dijkstra.
 
-### 3.4 Scalability Benchmark ($N = 50 \to 500$ Nodes)
+### 3.4 Multi-Seed Statistical Validation ($N = 5$ Seeds, 350 Rounds)
+Evaluated across 5 independent topologies to eliminate random deployment bias:
+- **Solar Regime:** $\Delta E = -0.0865\text{ J}$ ($p = 0.0015$, statistically significant advantage for Unaware Dijkstra due to zero relay reception dissipation).
+- **Shadowed Solar:** $\Delta E = -0.0418\text{ J}$ ($p = 0.0066$, Unaware Dijkstra preserves higher aggregate energy).
+- **Stochastic Regime:** $\Delta E = -0.0095\text{ J}$ ($p = 0.910$, statistically indistinguishable aggregate energy).
+- **Conclusion:** Single-path maximin bottleneck optimality (Theorem 1) does not automatically yield macroscopic network-level lifetime gains when uncoordinated cluster heads funnel traffic onto the same harvesting nodes.
+
+### 3.5 Scalability Benchmark ($N = 50 \to 500$ Nodes)
 Empirical latency scaling measurements confirm theoretical asymptotic complexity:
 - Dijkstra: $0.15\text{ ms}$ ($N=50$) $\to 37.2\text{ ms}$ ($N=500$)
 - Classical DP: $4.8\text{ ms}$ ($N=50$) $\to 168.7\text{ ms}$ ($N=500$)
