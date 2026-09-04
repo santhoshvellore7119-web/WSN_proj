@@ -11,7 +11,7 @@ import { TheoryDocsModal } from './components/TheoryDocsModal';
 import { SavedRunsModal } from './components/SavedRunsModal';
 import { useSimulation } from './hooks/useSimulation';
 import { SimulationConfig, SimulationResults } from './types';
-import { DEFAULT_CONFIG, PresetScenario } from './engine/presets';
+import { DEFAULT_CONFIG, PresetScenario } from './presets';
 import { AlertCircle } from 'lucide-react';
 
 export default function App() {

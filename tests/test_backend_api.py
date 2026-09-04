@@ -72,3 +72,46 @@ def test_invalid_job_status():
     response = client.get("/simulate/non-existent-uuid/status")
     assert response.status_code == 404
 
+
+def test_runs_endpoint():
+    """Verify /runs list endpoint returns JSON list."""
+    response = client.get("/runs")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+def test_scalability_experiment_endpoint():
+    """Verify /experiments/scalability executes Python simulation benchmarks."""
+    payload = {
+        "node_counts": [10, 20],
+        "rounds": 10,
+        "seed": 42
+    }
+    response = client.post("/experiments/scalability", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) == 2
+    assert "baseline_fnd" in data[0]
+    assert "adaptive_fnd" in data[0]
+    assert "computation_ms" in data[0]
+
+
+def test_heterogeneity_experiment_endpoint():
+    """Verify /experiments/heterogeneity executes spatial heterogeneity sweep."""
+    payload = {
+        "shadow_fractions": [0.2, 0.5],
+        "nodes": 20,
+        "rounds": 15,
+        "seed": 42
+    }
+    response = client.post("/experiments/heterogeneity", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) == 2
+    assert "shadowFraction" in data[0]
+    assert "unaware_fnd" in data[0]
+    assert "adaptive_fnd" in data[0]
+    assert "energyRetainedJ" in data[0]
+

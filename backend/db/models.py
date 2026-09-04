@@ -2,7 +2,7 @@
 SQLAlchemy models for storing simulation runs and results.
 """
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean, JSON
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from datetime import datetime
 
 Base = declarative_base()
@@ -11,10 +11,11 @@ class SimulationRun(Base):
     """Store simulation run configuration and summary."""
     __tablename__ = 'simulation_runs'
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     parameters = Column(Text)  # JSON string of simulation parameters
     summary = Column(Text)     # JSON string of simulation summary
+    results = Column(Text, nullable=True)  # JSON string of full simulation results
     status = Column(String(20), default='completed')  # pending, running, completed, failed
     job_id = Column(String(36), unique=True, index=True)  # UUID
 

@@ -10,7 +10,7 @@ import {
   FlaskConical,
   RotateCcw
 } from 'lucide-react';
-import { PRESET_SCENARIOS, PresetScenario } from '../engine/presets';
+import { PRESET_SCENARIOS, PresetScenario } from '../presets';
 import { SimulationConfig } from '../types';
 
 interface NavbarProps {

@@ -1,7 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { SimulationConfig, SimulationResults, BenchmarkResults } from '../types';
-import { WsnSimulator } from '../engine/simulator';
-import { runComprehensiveBenchmark } from '../engine/benchmark';
 
 export function useSimulation() {
   const [loading, setLoading] = useState<boolean>(false);
@@ -12,61 +10,50 @@ export function useSimulation() {
   const [benchmarkLoading, setBenchmarkLoading] = useState<boolean>(false);
   const [jobId, setJobId] = useState<string | null>(null);
 
-  const abortControllerRef = useRef<AbortController | null>(null);
-
   const runSimulation = useCallback(async (config: SimulationConfig) => {
     setLoading(true);
     setError(null);
-    setProgressText('Initializing WSN simulation...');
+    setProgressText('Submitting simulation to Python backend...');
 
     try {
-      // First try backend API endpoint
-      try {
-        const res = await fetch('/api/simulate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config)
-        });
+      const res = await fetch('/api/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
 
-        if (res.ok) {
-          const data = await res.json();
-          setJobId(data.job_id);
-          setProgressText('Running simulation in background...');
-
-          // Poll status
-          let attempts = 0;
-          while (attempts < 60) {
-            await new Promise(r => setTimeout(r, 250));
-            const statusRes = await fetch(`/api/simulate/${data.job_id}/status`);
-            if (statusRes.ok) {
-              const statusData = await statusRes.json();
-              if (statusData.status === 'completed' && statusData.results) {
-                setResults(statusData.results);
-                setLoading(false);
-                setProgressText('');
-                return;
-              } else if (statusData.status === 'failed') {
-                throw new Error(statusData.error || 'Backend simulation failed');
-              }
-            }
-            attempts++;
-          }
-        }
-      } catch (backendErr) {
-        console.warn('Backend API unavailable or slow, executing with local engine:', backendErr);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || `Backend returned status ${res.status}`);
       }
 
-      // High-performance client-side simulation engine
-      setProgressText('Simulating rounds with local engine...');
-      await new Promise(r => setTimeout(r, 20)); // allow UI tick
-      const sim = new WsnSimulator(config);
-      const simResult = sim.run();
-      setResults(simResult);
-      setJobId('local_' + Date.now());
-      setLoading(false);
-      setProgressText('');
+      const data = await res.json();
+      setJobId(data.job_id);
+      setProgressText('Simulating rounds in Python engine...');
+
+      // Poll backend job status until completed
+      let attempts = 0;
+      const maxAttempts = 240; // 60s timeout
+      while (attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 300));
+        const statusRes = await fetch(`/api/simulate/${data.job_id}/status`);
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          if (statusData.status === 'completed' && statusData.results) {
+            setResults(statusData.results);
+            setLoading(false);
+            setProgressText('');
+            return;
+          } else if (statusData.status === 'failed') {
+            throw new Error(statusData.error || 'Backend simulation failed');
+          }
+        }
+        attempts++;
+      }
+      throw new Error('Simulation timed out waiting for backend response');
     } catch (err: any) {
-      setError(err?.message || 'Simulation encountered an error');
+      console.error('Simulation error:', err);
+      setError(err?.message || 'Simulation encountered an error. Ensure the FastAPI backend is running on port 8000.');
       setLoading(false);
       setProgressText('');
     }
@@ -75,48 +62,45 @@ export function useSimulation() {
   const runBenchmark = useCallback(async (nodes: number = 50, rounds: number = 300, seed: number = 42) => {
     setBenchmarkLoading(true);
     setError(null);
-    setProgressText('Running 9-scenario comparative benchmark suite...');
+    setProgressText('Submitting comparative benchmark suite to Python backend...');
 
     try {
-      try {
-        const res = await fetch('/api/benchmark', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nodes, rounds, seed })
-        });
+      const res = await fetch('/api/benchmark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodes, rounds, seed })
+      });
 
-        if (res.ok) {
-          const data = await res.json();
-          let attempts = 0;
-          while (attempts < 80) {
-            await new Promise(r => setTimeout(r, 300));
-            const statusRes = await fetch(`/api/simulate/${data.job_id}/status`);
-            if (statusRes.ok) {
-              const statusData = await statusRes.json();
-              if (statusData.status === 'completed' && statusData.results) {
-                setBenchmarkResults(statusData.results);
-                setBenchmarkLoading(false);
-                setProgressText('');
-                return;
-              } else if (statusData.status === 'failed') {
-                throw new Error(statusData.error || 'Benchmark run failed');
-              }
-            }
-            attempts++;
-          }
-        }
-      } catch (bErr) {
-        console.warn('Backend benchmark API failed, falling back to local runner:', bErr);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || `Benchmark returned status ${res.status}`);
       }
 
-      // Local runner fallback
-      await new Promise(r => setTimeout(r, 20));
-      const bench = runComprehensiveBenchmark(nodes, rounds, seed);
-      setBenchmarkResults(bench);
-      setBenchmarkLoading(false);
-      setProgressText('');
+      const data = await res.json();
+      setProgressText('Executing comparative benchmark scenarios...');
+
+      let attempts = 0;
+      const maxAttempts = 300; // 90s timeout for full suite
+      while (attempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 400));
+        const statusRes = await fetch(`/api/simulate/${data.job_id}/status`);
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          if (statusData.status === 'completed' && statusData.results) {
+            setBenchmarkResults(statusData.results);
+            setBenchmarkLoading(false);
+            setProgressText('');
+            return;
+          } else if (statusData.status === 'failed') {
+            throw new Error(statusData.error || 'Benchmark run failed');
+          }
+        }
+        attempts++;
+      }
+      throw new Error('Benchmark timed out waiting for backend response');
     } catch (err: any) {
-      setError(err?.message || 'Benchmark failed');
+      console.error('Benchmark error:', err);
+      setError(err?.message || 'Benchmark failed. Ensure the FastAPI backend is running on port 8000.');
       setBenchmarkLoading(false);
       setProgressText('');
     }

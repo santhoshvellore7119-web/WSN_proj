@@ -6,7 +6,6 @@ import {
   Layers,
   Sun
 } from 'lucide-react';
-import { runScalabilitySweep, runHeterogeneitySweep } from '../engine/benchmark';
 import { ScalabilityResultPoint, HeterogeneityResultPoint } from '../types';
 
 interface ExperimentsViewProps {}
@@ -20,13 +19,18 @@ export const ExperimentsView: React.FC<ExperimentsViewProps> = () => {
 
   const handleRunDensitySweep = async () => {
     setLoading(true);
-    setProgress('Running node density sweep across [30, 50, 80, 120, 160] nodes...');
-    await new Promise(r => setTimeout(r, 20));
+    setProgress('Executing node density sweep on backend simulator (30 → 160 nodes)...');
     try {
-      const data = runScalabilitySweep([30, 50, 80, 120, 160], 200, 42);
+      const res = await fetch('/api/experiments/scalability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ node_counts: [30, 50, 80, 120, 160], rounds: 200, seed: 42 })
+      });
+      if (!res.ok) throw new Error('Scalability sweep request failed');
+      const data = await res.json();
       setScalabilityData(data);
     } catch (err) {
-      console.error(err);
+      console.error('Scalability sweep error:', err);
     } finally {
       setLoading(false);
       setProgress('');
@@ -35,13 +39,18 @@ export const ExperimentsView: React.FC<ExperimentsViewProps> = () => {
 
   const handleRunShadowSweep = async () => {
     setLoading(true);
-    setProgress('Running shadow canopy occlusion sweep across [0.1, 0.3, 0.5, 0.7, 0.9]...');
-    await new Promise(r => setTimeout(r, 20));
+    setProgress('Executing canopy shadow occlusion sweep on backend simulator (10% → 90%)...');
     try {
-      const data = runHeterogeneitySweep([0.1, 0.3, 0.5, 0.7, 0.9], 50, 250, 42);
+      const res = await fetch('/api/experiments/heterogeneity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shadow_fractions: [0.1, 0.3, 0.5, 0.7, 0.9], nodes: 50, rounds: 250, seed: 42 })
+      });
+      if (!res.ok) throw new Error('Heterogeneity sweep request failed');
+      const data = await res.json();
       setHeterogeneityData(data);
     } catch (err) {
-      console.error(err);
+      console.error('Heterogeneity sweep error:', err);
     } finally {
       setLoading(false);
       setProgress('');

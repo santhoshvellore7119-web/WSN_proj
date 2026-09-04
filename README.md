@@ -4,25 +4,25 @@ A simulation and deployment planning framework for Wireless Sensor Networks (WSN
 
 ---
 
-## 🏗️ System Architecture: 3 Interfaces, 1 Core Engine
+## 🏗️ System Architecture: Unified Simulation Core
 
-The repository provides three distinct entrypoints to the same modular simulation engine:
+The repository provides a single Python simulation engine (`src/`) with two integrated interfaces:
 
 ```
                                   ┌────────────────────────┐
                                   │   User / Evaluator     │
                                   └───────────┬────────────┘
                                               │
-                    ┌─────────────────────────┼─────────────────────────┐
-                    ▼                         ▼                         ▼
-          ┌───────────────────┐     ┌───────────────────┐     ┌───────────────────┐
-          │   CLI Interface   │     │  Streamlit App    │     │  FastAPI + React  │
-          │  (Research & CI)  │     │ (Interactive UI)  │     │  (Full-Stack Web) │
-          └─────────┬─────────┘     └─────────┬─────────┘     └─────────┬─────────┘
-                    │                         │                         │
-                    │   main.py / run_*.py    │   streamlit run app.py  │   REST API :8000
-                    │                         │                         │   React App :3000
-                    └─────────────────────────┼─────────────────────────┘
+                    ┌─────────────────────────┴─────────────────────────┐
+                    ▼                                                   ▼
+          ┌───────────────────┐                               ┌───────────────────┐
+          │   CLI Interface   │                               │  FastAPI + React  │
+          │  (Research & CI)  │                               │  (Full-Stack Web) │
+          └─────────┬─────────┘                               └─────────┬─────────┘
+                    │                                                   │
+                    │   main.py / run_*.py                              │   REST API :8000
+                    │                                                   │   React App :3000
+                    └─────────────────────────┬─────────────────────────┘
                                               ▼
                              ┌──────────────────────────────────┐
                              │  WSN Simulator Engine (`src/`)   │
@@ -34,10 +34,9 @@ The repository provides three distinct entrypoints to the same modular simulatio
                              └──────────────────────────────────┘
 ```
 
-1. **CLI Simulator (`main.py`, `run_experiments.py`):** Fast, headless command-line interface for batch parameter sweeps, multi-seed statistical testing, and automated CI pipelines.
-2. **Streamlit Interactive Dashboard (`app.py`):** Single-command interactive interface (`streamlit run app.py`) with real-time parameter sliders, routing topology scrubbers, and energy heatmaps.
-3. **Full-Stack REST & React Application (`backend/` + `frontend/`):** Production-style web application with an asynchronous FastAPI backend and a responsive React (Recharts + SVG) dashboard.
-4. **Multi-Container Orchestration (`docker-compose.yml`):** Boot the full-stack system with a single command (`docker compose up`).
+1. **CLI Simulator (`main.py`, `run_experiments.py`, `run_multiseed.py`):** Headless command-line interface for batch parameter sweeps, multi-seed statistical testing, and automated CI pipelines.
+2. **Full-Stack REST & React Application (`backend/` + `frontend/`):** Full-stack web application with an asynchronous FastAPI backend and a responsive React (Recharts + SVG) dashboard, backed by SQLite persistence.
+3. **Multi-Container Orchestration (`docker-compose.yml`):** Boot the full-stack system with a single command (`docker compose up`).
 
 ---
 
@@ -108,16 +107,18 @@ python -m venv .venv
 
 # Install dependencies
 pip install -r requirements.txt
-pip install fastapi uvicorn httpx scipy
 ```
 
-### 2. Option A: Run CLI Simulation
+### 2. Option A: Run CLI Simulation & Experiments
 ```bash
 # Run a single 50-node simulation with visualization plots
 python main.py --nodes 50 --rounds 200 --harvesting solar --visualize
 
 # Run the 5-scenario benchmark comparison
 python run_experiments.py
+
+# Run multi-seed statistical evaluation
+python run_multiseed.py
 
 # Run the heterogeneity sweep
 python run_heterogeneity_sweep.py
@@ -129,13 +130,7 @@ python run_scalability_benchmark.py
 python run_real_trace_experiment.py
 ```
 
-### 3. Option B: Launch Streamlit Dashboard
-```bash
-streamlit run app.py
-```
-Open [http://localhost:8501](http://localhost:8501) in your browser.
-
-### 4. Option C: Launch FastAPI + React Web App
+### 3. Option B: Launch FastAPI + React Web App
 ```bash
 # Terminal 1: Backend API
 cd backend
@@ -144,11 +139,11 @@ python -m uvicorn main:app --reload --port 8000
 # Terminal 2: React Frontend
 cd frontend
 npm install
-npm start
+npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000) (connected to API at `localhost:8000`).
 
-### 5. Option D: Launch with Docker Compose
+### 4. Option C: Launch with Docker Compose
 ```bash
 docker compose up --build
 ```
@@ -163,9 +158,9 @@ docker compose up --build
 # Run Python unit tests (Core algorithms, literature baselines, and FastAPI TestClient)
 pytest -v
 
-# Run React frontend tests & production build verification
+# Run React frontend type checking & production build verification
 cd frontend
-npm test -- --watchAll=false
+npm run lint
 npm run build
 cd ..
 ```

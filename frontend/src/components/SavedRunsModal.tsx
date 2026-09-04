@@ -19,8 +19,32 @@ export const SavedRunsModal: React.FC<SavedRunsModalProps> = ({
 }) => {
   const [savedRuns, setSavedRuns] = useState<SavedRun[]>([]);
   const [saveName, setSaveName] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
 
-  useEffect(() => {
+  const fetchSavedRuns = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/runs');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const formatted: SavedRun[] = data.map((r: any) => ({
+            id: String(r.id || r.job_id),
+            name: r.name || `Simulation (${r.parameters?.nodes || 50} nodes, ${r.parameters?.rounds || 200} rds)`,
+            createdAt: r.created_at ? new Date(r.created_at).toLocaleString() : 'Recent',
+            config: r.parameters || currentConfig,
+            summary: r.summary || {},
+            results: r.results
+          }));
+          setSavedRuns(formatted);
+          setLoading(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch runs from backend SQLite, falling back to local storage:', e);
+    }
+
     try {
       const stored = localStorage.getItem('wsn_saved_runs');
       if (stored) {
@@ -29,11 +53,18 @@ export const SavedRunsModal: React.FC<SavedRunsModalProps> = ({
     } catch (e) {
       console.error(e);
     }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchSavedRuns();
+    }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSaveCurrent = () => {
+  const handleSaveCurrent = async () => {
     if (!currentResults) return;
     const name = saveName.trim() || `Run ${new Date().toLocaleTimeString()} (${currentConfig.nodes} nodes)`;
     const newRun: SavedRun = {
@@ -45,16 +76,67 @@ export const SavedRunsModal: React.FC<SavedRunsModalProps> = ({
       results: currentResults
     };
 
-    const updated = [newRun, ...savedRuns].slice(0, 10); // keep 10 latest
+    // Try saving to backend
+    try {
+      await fetch('/api/runs/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          config: currentConfig,
+          summary: currentResults.summary,
+          results: currentResults
+        })
+      });
+    } catch (e) {
+      console.warn('Backend save failed, keeping in local state:', e);
+    }
+
+    const updated = [newRun, ...savedRuns].slice(0, 15);
     setSavedRuns(updated);
-    localStorage.setItem('wsn_saved_runs', JSON.stringify(updated));
+    try {
+      localStorage.setItem('wsn_saved_runs', JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
     setSaveName('');
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
+    try {
+      await fetch(`/api/runs/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn('Backend delete failed:', e);
+    }
     const updated = savedRuns.filter(r => r.id !== id);
     setSavedRuns(updated);
-    localStorage.setItem('wsn_saved_runs', JSON.stringify(updated));
+    try {
+      localStorage.setItem('wsn_saved_runs', JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleLoad = async (run: SavedRun) => {
+    if (run.results) {
+      onLoadRun(run.results, run.config);
+      onClose();
+      return;
+    }
+    // If results not populated in summary, fetch full detail from backend
+    try {
+      const res = await fetch(`/api/runs/${run.id}`);
+      if (res.ok) {
+        const fullData = await res.json();
+        if (fullData.results) {
+          onLoadRun(fullData.results, fullData.config || run.config);
+          onClose();
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load run details from backend:', e);
+    }
   };
 
   return (
@@ -147,18 +229,13 @@ export const SavedRunsModal: React.FC<SavedRunsModalProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    {run.results && (
-                      <button
-                        onClick={() => {
-                          onLoadRun(run.results!, run.config);
-                          onClose();
-                        }}
-                        className="py-1 px-2.5 rounded bg-[#181a24] hover:bg-[#202330] text-slate-200 border border-[#2a2e3e] text-xs font-medium flex items-center gap-1 transition-colors"
-                      >
-                        <Play className="w-3 h-3 fill-current" />
-                        <span>Load</span>
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleLoad(run)}
+                      className="py-1 px-2.5 rounded bg-[#181a24] hover:bg-[#202330] text-slate-200 border border-[#2a2e3e] text-xs font-medium flex items-center gap-1 transition-colors"
+                    >
+                      <Play className="w-3 h-3 fill-current" />
+                      <span>Load</span>
+                    </button>
                     <button
                       onClick={() => handleDelete(run.id)}
                       className="p-1.5 rounded bg-[#101218] hover:bg-[#221010] text-slate-400 hover:text-rose-300 border border-[#20232e] transition-colors"

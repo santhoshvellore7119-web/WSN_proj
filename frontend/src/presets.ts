@@ -1,4 +1,4 @@
-import { SimulationConfig } from '../types';
+import { SimulationConfig } from './types';
 
 export interface PresetScenario {
   id: string;

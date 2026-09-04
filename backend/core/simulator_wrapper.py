@@ -145,31 +145,105 @@ class SimulatorWrapper:
 
         return results
 
-    def run_benchmark(self) -> Dict[str, Any]:
+    def run_benchmark(self, num_nodes: int = 50, max_rounds: int = 300, seed: int = 42) -> Dict[str, Any]:
         """
-        Run the standard 5-scenario benchmark from run_experiments.py.
-
-        Returns:
-            Dictionary containing benchmark results for all 5 scenarios
+        Run structured comparative benchmark scenarios using core Simulator.
         """
-        # Import the benchmark function
-        from run_experiments import run_all_experiments
-        import io
-        import sys
-        from contextlib import redirect_stdout
+        from datetime import datetime
 
-        # Capture benchmark output
-        f = io.StringIO()
-        with redirect_stdout(f):
-            run_all_experiments()
+        scenarios_defs = [
+            {
+                'id': 'baseline',
+                'name': 'Baseline (No Harvesting, LEACH + Dijkstra)',
+                'category': 'Baseline',
+                'strategy': 'Unaware',
+                'kwargs': dict(harvesting_profile=None, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False)
+            },
+            {
+                'id': 'solar_unaware',
+                'name': 'Solar Diurnal — Unaware (LEACH + Dijkstra)',
+                'category': 'Synchronous Solar',
+                'strategy': 'Unaware',
+                'kwargs': dict(harvesting_profile='solar', harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5, 'seed': seed}, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False)
+            },
+            {
+                'id': 'solar_adaptive',
+                'name': 'Solar Diurnal — Adaptive (Time-DP + EH-LEACH + DSU)',
+                'category': 'Synchronous Solar',
+                'strategy': 'Adaptive (Time-DP + DSU)',
+                'kwargs': dict(harvesting_profile='solar', harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5, 'seed': seed}, enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True, max_dp_hops=5)
+            },
+            {
+                'id': 'shadow_unaware',
+                'name': 'Canopy Shade — Unaware (LEACH + Dijkstra)',
+                'category': 'Shadowed Solar',
+                'strategy': 'Unaware',
+                'kwargs': dict(harvesting_profile='heterogeneous_shadowed', harvesting_kwargs={'shadow_fraction': 0.4, 'shadow_penalty': 0.1, 'peak_rate': 0.0012, 'seed': seed}, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False)
+            },
+            {
+                'id': 'shadow_adaptive',
+                'name': 'Canopy Shade — Adaptive (Time-DP + EH-LEACH + DSU)',
+                'category': 'Shadowed Solar',
+                'strategy': 'Adaptive (Time-DP + DSU)',
+                'kwargs': dict(harvesting_profile='heterogeneous_shadowed', harvesting_kwargs={'shadow_fraction': 0.4, 'shadow_penalty': 0.1, 'peak_rate': 0.0012, 'seed': seed}, enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True, max_dp_hops=5)
+            },
+            {
+                'id': 'stoch_unaware',
+                'name': 'Stochastic Poisson — Unaware (LEACH + Dijkstra)',
+                'category': 'Stochastic Poisson',
+                'strategy': 'Unaware',
+                'kwargs': dict(harvesting_profile='stochastic', harvesting_kwargs={'lambda_rate': 2.0, 'quantum': 0.00015, 'seed': seed}, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False)
+            },
+            {
+                'id': 'stoch_adaptive',
+                'name': 'Stochastic Poisson — Adaptive (Time-DP + EH-LEACH + DSU)',
+                'category': 'Stochastic Poisson',
+                'strategy': 'Adaptive (Time-DP + DSU)',
+                'kwargs': dict(harvesting_profile='stochastic', harvesting_kwargs={'lambda_rate': 2.0, 'quantum': 0.00015, 'seed': seed}, enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True, max_dp_hops=5)
+            }
+        ]
 
-        output = f.getvalue()
+        scenario_results = []
+        for s in scenarios_defs:
+            sim = Simulator(
+                num_nodes=num_nodes,
+                area_width=100.0,
+                area_height=100.0,
+                initial_energy=0.045,
+                max_battery_capacity=0.50,
+                desired_clusters_ratio=0.08,
+                seed=seed,
+                **s['kwargs']
+            )
+            sim.run(max_rounds=max_rounds, verbose=False)
 
-        # For now, return the output text
-        # In a more refined version, we would parse the table and return structured data
+            scenario_results.append({
+                'id': s['id'],
+                'name': s['name'],
+                'category': s['category'],
+                'strategy': s['strategy'],
+                'fnd': sim.first_node_death_round,
+                'hnd': sim.half_nodes_dead_round,
+                'lnd': sim.last_node_death_round,
+                'finalAliveNodes': sim.alive_nodes_history[-1] if sim.alive_nodes_history else 0,
+                'totalNodes': num_nodes,
+                'finalTotalEnergy': round(sim.total_energy_history[-1] if sim.total_energy_history else 0.0, 4),
+                'totalHarvested': round(sum(sim.harvested_energy_history), 4),
+                'rerouteCount': sum(sim.reroute_events_history),
+                'config': s['kwargs'],
+                'timeSeriesSummary': {
+                    'rounds': list(range(1, len(sim.alive_nodes_history) + 1)),
+                    'aliveNodes': sim.alive_nodes_history,
+                    'totalEnergy': [round(e, 4) for e in sim.total_energy_history]
+                }
+            })
+
         return {
-            'benchmark_output': output,
-            'note': 'Full benchmark results captured as text. For structured data, individual scenarios would need to be run separately.'
+            'scenarios': scenario_results,
+            'timestamp': datetime.utcnow().isoformat(),
+            'seed': seed,
+            'nodesCount': num_nodes,
+            'maxRounds': max_rounds
         }
 
     def get_simulation_summary(self, results: Dict[str, Any]) -> Dict[str, Any]:

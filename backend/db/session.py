@@ -20,6 +20,9 @@ def init_db():
     """Initialize the database - create tables if they don't exist."""
     Base.metadata.create_all(bind=engine)
 
+# Auto-initialize tables
+init_db()
+
 def get_db_session():
     """Get a database session."""
     db = SessionLocal()
