@@ -1,7 +1,5 @@
-"""
-FastAPI application for WSN Energy-Harvesting Routing Simulator service.
-"""
 from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi.responses import PlainTextResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
@@ -159,6 +157,62 @@ async def get_simulation_status(job_id: str):
         error=job["error"],
         created_at=job["created_at"],
         completed_at=job["completed_at"]
+    )
+
+def generate_csv_from_results(results: Dict[str, Any]) -> str:
+    summary = results.get("summary", {})
+    ts = results.get("time_series", {})
+    cfg = results.get("configuration", {})
+    lines = [
+        f"# WSN Energy-Harvesting Simulation Report",
+        f"# Algorithm: {cfg.get('routing_algorithm', 'N/A')} | Profile: {cfg.get('harvesting_profile', 'N/A')} | Nodes: {cfg.get('nodes', 'N/A')} | Rounds: {cfg.get('rounds', 'N/A')}",
+        f"# FND: {summary.get('first_node_death_round', 'N/A')} | Alive: {summary.get('final_alive_nodes', 'N/A')}/{summary.get('total_nodes', 'N/A')} | Total Residual: {summary.get('final_total_energy', 0):.4f} J",
+        f"round,alive_nodes,total_energy_joules,harvested_energy_joules,consumed_energy_joules,reroute_events,jains_fairness_index,packet_delivery_ratio"
+    ]
+    rounds = ts.get("rounds", [])
+    alive = ts.get("alive_nodes", [])
+    total_e = ts.get("total_energy", [])
+    harv = ts.get("harvested_energy", [])
+    cons = ts.get("consumed_energy", [])
+    reroutes = ts.get("reroute_events", [])
+    fairness = ts.get("fairness_index", [])
+    pdr = ts.get("pdr_history", [])
+    for i in range(len(rounds)):
+        r = rounds[i]
+        al = alive[i] if i < len(alive) else 0
+        tot = total_e[i] if i < len(total_e) else 0.0
+        h = harv[i] if i < len(harv) else 0.0
+        c = cons[i] if i < len(cons) else 0.0
+        re = reroutes[i] if i < len(reroutes) else 0
+        f = fairness[i] if i < len(fairness) else 1.0
+        p = pdr[i] if i < len(pdr) else 1.0
+        lines.append(f"{r},{al},{tot:.6f},{h:.6f},{c:.6f},{re},{f:.4f},{p:.4f}")
+    return "\n".join(lines)
+
+@app.get("/simulate/{job_id}/csv", response_class=PlainTextResponse)
+async def get_simulation_csv(job_id: str):
+    """Export time-series metrics for a simulation job as downloadable CSV."""
+    results_data = None
+    if job_id in jobs and jobs[job_id]["results"]:
+        results_data = jobs[job_id]["results"]
+    else:
+        db = SessionLocal()
+        run = db.query(SimulationRun).filter(SimulationRun.job_id == job_id).first()
+        db.close()
+        if run and run.results:
+            try:
+                results_data = json.loads(run.results)
+            except Exception:
+                results_data = None
+    
+    if not results_data or "time_series" not in results_data:
+        raise HTTPException(status_code=404, detail="Simulation results not found or still pending")
+
+    csv_text = generate_csv_from_results(results_data)
+    return PlainTextResponse(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="wsn_sim_{job_id[:8]}.csv"'}
     )
 
 @app.post("/benchmark")

@@ -115,3 +115,35 @@ def test_heterogeneity_experiment_endpoint():
     assert "adaptive_fnd" in data[0]
     assert "energyRetainedJ" in data[0]
 
+
+def test_csv_export_endpoint():
+    """Verify /simulate/{job_id}/csv generates CSV for completed simulation."""
+    from backend.main import jobs
+    mock_id = "test-job-csv-123"
+    jobs[mock_id] = {
+        "status": "completed",
+        "config": {"routing_algorithm": "dp_time_augmented", "harvesting_profile": "solar", "nodes": 10, "rounds": 5},
+        "results": {
+            "summary": {"first_node_death_round": None, "final_alive_nodes": 10, "total_nodes": 10, "final_total_energy": 5.2},
+            "configuration": {"routing_algorithm": "dp_time_augmented", "harvesting_profile": "solar", "nodes": 10, "rounds": 5},
+            "time_series": {
+                "rounds": [1, 2, 3, 4, 5],
+                "alive_nodes": [10, 10, 10, 10, 10],
+                "total_energy": [5.0, 5.1, 5.2, 5.3, 5.2],
+                "harvested_energy": [0.1, 0.1, 0.1, 0.1, 0.1],
+                "consumed_energy": [0.05, 0.05, 0.05, 0.05, 0.05],
+                "reroute_events": [0, 0, 0, 0, 0],
+                "fairness_index": [1.0, 1.0, 1.0, 1.0, 1.0],
+                "pdr_history": [1.0, 1.0, 1.0, 1.0, 1.0]
+            }
+        },
+        "created_at": None,
+        "completed_at": None,
+        "error": None
+    }
+    resp = client.get(f"/simulate/{mock_id}/csv")
+    assert resp.status_code == 200
+    assert "text/csv" in resp.headers["content-type"]
+    assert "round,alive_nodes,total_energy_joules" in resp.text
+    assert "1,10,5.000000" in resp.text
+

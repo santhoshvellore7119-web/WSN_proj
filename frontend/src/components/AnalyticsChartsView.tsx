@@ -6,6 +6,7 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import { SimulationResults, SimulationConfig } from '../types';
+import { exportSimulationCSV } from '../utils/exportUtils';
 
 interface AnalyticsChartsViewProps {
   results: SimulationResults | null;
@@ -46,32 +47,11 @@ export const AnalyticsChartsView: React.FC<AnalyticsChartsViewProps> = ({
     downloadAnchor.remove();
   };
 
-  // Export CSV
+  // Export CSV using structured exporter
   const handleExportCSV = () => {
-    let csvContent = 'data:text/csv;charset=utf-8,';
-    csvContent += 'Round,AliveNodes,TotalEnergyJ,HarvestedEnergyJ,ConsumedEnergyJ,RerouteEvents,JainsFairness,DeliveryRatio\n';
-    
-    for (let i = 0; i < numRounds; i++) {
-      const row = [
-        time_series.rounds[i],
-        time_series.alive_nodes[i],
-        time_series.total_energy[i],
-        time_series.harvested_energy[i],
-        time_series.consumed_energy[i],
-        time_series.reroute_events[i],
-        time_series.fairness_index[i],
-        time_series.pdr_history[i]
-      ].join(',');
-      csvContent += row + '\n';
+    if (results) {
+      exportSimulationCSV(results);
     }
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `wsn_simulation_timeseries_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
   };
 
   // Helper for responsive SVG line charts

@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { NodePosition, SimulationConfig, SimulationResults } from '../types';
+import { exportSvgElement, exportSimulationCSV } from '../utils/exportUtils';
 import {
   ZoomIn,
   ZoomOut,
@@ -8,7 +9,10 @@ import {
   Zap,
   Radio,
   Share2,
-  Info
+  Info,
+  Flame,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface NetworkTopologyViewProps {
@@ -30,8 +34,10 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
   const [showClusters, setShowClusters] = useState<boolean>(true);
   const [showRoutes, setShowRoutes] = useState<boolean>(true);
   const [showLabels, setShowLabels] = useState<boolean>(false);
+  const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   const areaSize = config.area || 100;
   const numNodes = config.nodes || 50;
@@ -82,6 +88,18 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
     setPan({ x: 0, y: 0 });
   };
 
+  const handleExportSvg = () => {
+    if (svgRef.current) {
+      exportSvgElement(svgRef.current, `wsn_topology_r${roundIdx}.svg`);
+    }
+  };
+
+  const handleExportCsv = () => {
+    if (results) {
+      exportSimulationCSV(results);
+    }
+  };
+
   // Build node data for rendering
   const nodes = [];
   for (let i = 0; i < numNodes; i++) {
@@ -130,7 +148,7 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
           )}
         </div>
 
-        {/* View toggles & zoom controls */}
+        {/* View toggles, Export & zoom controls */}
         <div className="flex items-center gap-2 text-xs">
           <div className="flex items-center bg-[#07080a] p-0.5 rounded border border-[#1c1e28]">
             <button
@@ -154,6 +172,16 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
               <span>Routes</span>
             </button>
             <button
+              onClick={() => setShowHeatmap(!showHeatmap)}
+              className={`px-2 py-1 rounded text-[11px] flex items-center gap-1 transition-colors ${
+                showHeatmap ? 'bg-[#1e1a12] text-amber-300 font-medium border border-[#3e341a]' : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Toggle Live Energy Heatmap Overlay"
+            >
+              <Flame className="w-3 h-3" />
+              <span>Heatmap</span>
+            </button>
+            <button
               onClick={() => setShowLabels(!showLabels)}
               className={`px-2 py-1 rounded text-[11px] flex items-center gap-1 transition-colors ${
                 showLabels ? 'bg-[#181a24] text-slate-100 font-medium border border-[#2a2e3e]' : 'text-slate-400 hover:text-slate-200'
@@ -165,6 +193,29 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
             </button>
           </div>
 
+          {/* Export Action Buttons */}
+          <div className="flex items-center bg-[#07080a] p-0.5 rounded border border-[#1c1e28]">
+            <button
+              onClick={handleExportSvg}
+              className="px-2 py-1 text-slate-300 hover:text-slate-100 rounded text-[11px] flex items-center gap-1 hover:bg-[#14161f] transition-colors"
+              title="Export Current Topology View as SVG Vector Graphic"
+            >
+              <Download className="w-3 h-3" />
+              <span>SVG</span>
+            </button>
+            {results && (
+              <button
+                onClick={handleExportCsv}
+                className="px-2 py-1 text-slate-300 hover:text-slate-100 rounded text-[11px] flex items-center gap-1 hover:bg-[#14161f] transition-colors"
+                title="Export Simulation Time-Series Metrics as CSV"
+              >
+                <FileSpreadsheet className="w-3 h-3 text-emerald-400" />
+                <span>CSV</span>
+              </button>
+            )}
+          </div>
+
+          {/* Zoom Controls */}
           <div className="flex items-center bg-[#07080a] p-0.5 rounded border border-[#1c1e28]">
             <button
               onClick={() => setZoom(prev => Math.min(prev * 1.2, 4))}
@@ -202,6 +253,7 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
         className="flex-1 w-full h-[540px] bg-black relative overflow-hidden cursor-grab active:cursor-grabbing select-none"
       >
         <svg
+          ref={svgRef}
           className="w-full h-full"
           viewBox={`0 0 600 600`}
           preserveAspectRatio="xMidYMid meet"
@@ -215,12 +267,42 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
             <pattern id="shadowHatch" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
               <line x1="0" y1="0" x2="0" y2="8" stroke="#171a24" strokeWidth="2" opacity="0.7" />
             </pattern>
+            {/* Heatmap Node Glow */}
+            <radialGradient id="nodeHeatGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.5" />
+              <stop offset="50%" stopColor="#059669" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#047857" stopOpacity="0" />
+            </radialGradient>
+            <radialGradient id="nodeHeatLow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.4" />
+              <stop offset="60%" stopColor="#d97706" stopOpacity="0.15" />
+              <stop offset="100%" stopColor="#b45309" stopOpacity="0" />
+            </radialGradient>
           </defs>
 
           <g transform={`translate(${pan.x + 300}, ${pan.y + 300}) scale(${zoom}) translate(-300, -300)`}>
             {/* Background Grid */}
             <rect x="0" y="0" width="600" height="600" fill="url(#grid)" />
             <rect x="0" y="0" width="600" height="600" fill="none" stroke="#1f2230" strokeWidth="1.2" />
+
+            {/* Heatmap Overlay Field */}
+            {showHeatmap && nodes.map((node) => {
+              if (!node.isAlive) return null;
+              const cx = (node.x / areaSize) * 600;
+              const cy = (node.y / areaSize) * 600;
+              const glowRadius = Math.max(15, node.energyRatio * 60);
+              const gradId = node.energyRatio > 0.3 ? 'nodeHeatGlow' : 'nodeHeatLow';
+              return (
+                <circle
+                  key={`heat-${node.id}`}
+                  cx={cx}
+                  cy={cy}
+                  r={glowRadius}
+                  fill={`url(#${gradId})`}
+                  style={{ mixBlendMode: 'screen' }}
+                />
+              );
+            })}
 
             {/* If shadowed solar regime, draw shadow zone */}
             {config.harvesting_profile === 'shadowed_solar' && (
@@ -306,23 +388,53 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
                   vY = vNode ? (vNode.y / areaSize) * 600 : (bsY / areaSize) * 600;
                 }
 
+                // Dynamic Link Color based on transmitter residual energy
+                const uEnergyRatio = uNode ? uNode.energyRatio : 1.0;
+                let linkColor = '#22c55e'; // Emerald
+                let pulseColor = '#4ade80';
+                if (uEnergyRatio < 0.2) {
+                  linkColor = '#ef4444'; // Red
+                  pulseColor = '#f87171';
+                } else if (uEnergyRatio < 0.5) {
+                  linkColor = '#f59e0b'; // Amber
+                  pulseColor = '#fbbf24';
+                }
+
+                const midX = (uX + vX) / 2;
+                const midY = (uY + vY) / 2;
+
                 pathSegments.push(
                   <g key={`route-${chId}-${u}-${v}-${idx}`}>
+                    {/* Shadow / Halo Line */}
                     <line
                       x1={uX}
                       y1={uY}
                       x2={vX}
                       y2={vY}
-                      stroke="#426b57"
-                      strokeWidth="1.5"
+                      stroke={linkColor}
+                      strokeWidth="3.5"
+                      strokeOpacity="0.2"
+                      strokeLinecap="round"
+                    />
+                    {/* Main Link Line */}
+                    <line
+                      x1={uX}
+                      y1={uY}
+                      x2={vX}
+                      y2={vY}
+                      stroke={linkColor}
+                      strokeWidth="1.6"
                       strokeLinecap="round"
                       opacity="0.9"
                     />
+                    {/* Active Packet Transmission Pulse Dot */}
                     <circle
-                      cx={(uX + vX) / 2}
-                      cy={(uY + vY) / 2}
-                      r="1.8"
-                      fill="#5e8c75"
+                      cx={midX}
+                      cy={midY}
+                      r="2.2"
+                      fill={pulseColor}
+                      stroke="#000000"
+                      strokeWidth="0.5"
                     />
                   </g>
                 );
@@ -472,12 +584,20 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
               <span className="text-slate-400">Depleted</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-4 h-0.5 bg-[#426b57] inline-block"></span>
-              <span className="text-slate-300">Multi-Hop Path</span>
+              <span className="w-3.5 h-1 bg-[#22c55e] rounded-full inline-block"></span>
+              <span className="text-slate-300">Path (Healthy)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-1 bg-[#f59e0b] rounded-full inline-block"></span>
+              <span className="text-slate-300">Path (Low Batt)</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-4 h-0.5 bg-[#3f4758] border-b border-dotted inline-block"></span>
               <span className="text-slate-300">Cluster Link</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 opacity-75 inline-block"></span>
+              <span className="text-slate-300">Data Packet</span>
             </div>
           </div>
         </div>
