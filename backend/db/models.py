@@ -3,7 +3,7 @@ SQLAlchemy models for storing simulation runs and results.
 """
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean, JSON
 from sqlalchemy.orm import declarative_base
-from datetime import datetime
+from datetime import datetime, timezone
 
 Base = declarative_base()
 
@@ -12,7 +12,7 @@ class SimulationRun(Base):
     __tablename__ = 'simulation_runs'
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     parameters = Column(Text)  # JSON string of simulation parameters
     summary = Column(Text)     # JSON string of simulation summary
     results = Column(Text, nullable=True)  # JSON string of full simulation results

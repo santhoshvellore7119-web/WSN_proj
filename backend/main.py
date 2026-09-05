@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 import uuid
 import json
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 
 import os
 import sys
@@ -112,7 +112,7 @@ async def start_simulation(config: SimulationConfig, background_tasks: Backgroun
     jobs[job_id] = {
         "status": "pending",
         "config": cfg_dict,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
         "completed_at": None,
         "results": None,
         "error": None
@@ -223,7 +223,7 @@ async def run_benchmark(background_tasks: BackgroundTasks):
     jobs[job_id] = {
         "status": "pending",
         "config": {"benchmark": True},
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
         "completed_at": None,
         "results": None,
         "error": None
@@ -328,7 +328,7 @@ async def save_simulation_run(run_id: str):
         return {"message": "Run already saved in database", "id": existing.id, "job_id": run_id}
 
     db_run = SimulationRun(
-        created_at=job["created_at"] if isinstance(job["created_at"], datetime) else datetime.utcnow(),
+        created_at=job["created_at"] if isinstance(job["created_at"], datetime) else datetime.now(timezone.utc),
         parameters=json.dumps(job["config"]),
         summary=json.dumps(job["results"].get("summary", {}) if job["results"] else {}),
         results=json.dumps(job["results"]) if job["results"] else None,

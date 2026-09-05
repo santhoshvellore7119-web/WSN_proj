@@ -21,7 +21,7 @@ When nodes harvest ambient energy (solar irradiance, thermal gradients, or ambie
 - **Fast Fault Recovery:** Implement **Disjoint-Set Union (Union-Find)** with path compression and union-by-rank for instantaneous local detour rerouting ($O(\text{deg}(u) \cdot \alpha(V))$).
 - **Literature Baselines:** Benchmark against published EH-WSN protocols (**EH-LEACH** and predictive energy-weighted shortest path).
 - **Empirical Rigor:** Evaluate under real-world solar irradiance traces (NREL NSRDB), spatial heterogeneity sweeps ($p_{\text{shadow}} \in [0.0, 1.0]$), and multi-seed statistical significance tests (paired Wilcoxon signed-rank and Student's t-test).
-- **Full-Stack Engineering:** Provide 3 unified interfaces (CLI, Streamlit dashboard, FastAPI + React web application) with full-stack CI and Docker containerization.
+- **Full-Stack Engineering:** Provide 2 unified interfaces (CLI research tools and FastAPI + React web application) with full-stack CI and Docker containerization.
 
 ---
 
@@ -42,7 +42,7 @@ wsn-energy-routing/
 │   └── visualize.py         # Matplotlib plotting routines and heatmap generators
 ├── backend/                 # FastAPI REST API with async background tasks and SQLite models
 ├── frontend/                # React dashboard with interactive network SVG and Recharts graphs
-├── tests/                   # Pytest suite (46 unit tests covering core + baselines + API)
+├── tests/                   # Pytest suite (50 unit tests covering core + baselines + API)
 ├── Dockerfile.backend       # Python 3.12 container definition
 ├── Dockerfile.frontend      # Node 18 / Nginx container definition
 └── docker-compose.yml       # Single-command full-stack deployment
@@ -61,13 +61,13 @@ wsn-energy-routing/
 ## 3. Experimental Validation & Results
 
 ### 3.1 Unit Testing
-All **46 unit tests** pass with `pytest` in $< 2.5\text{s}$, verifying:
+All **50 unit tests** pass with `pytest` in $< 3.5\text{s}$, verifying:
 - Radio energy calculations and crossover threshold $d_0 = \sqrt{E_{fs}/E_{mp}} \approx 87.7\text{m}$.
 - Deterministic 5-node adversarial counterexample isolating the lookahead mechanism.
 - Classical and Time-Augmented DP table filling, battery clamping, and backpointer reconstruction.
 - Disjoint-Set Union connectivity, rank optimization, and local detour splicing.
 - Literature baselines: EH-LEACH election and RealTrace solar sampling.
-- FastAPI backend routes (`/health`, `/simulate`, `/benchmark`, `/jobs/{id}`) via `TestClient`.
+- FastAPI backend routes (`/health`, `/simulate`, `/benchmark`, `/runs`, `/experiments/scalability`, `/experiments/heterogeneity`, `/simulate/{job_id}/csv`) via `TestClient`.
 
 ### 3.2 Canonical Benchmark (50 Nodes, 350 Rounds, $R_{\text{tx}} = 35.0\text{m}$, Seed 42)
 
@@ -87,12 +87,12 @@ All **46 unit tests** pass with `pytest` in $< 2.5\text{s}$, verifying:
   - In extreme occlusion ($p_{\text{shadow}} = 1.0$), where all active relays suffer heavy solar deprivation, Time-Augmented DP's lookahead routing actively protects vulnerable forwarders, extending network operational lifetime by **+6 rounds** (FND 102 vs 96) and preserving greater residual energy (+1.2% gain, $0.0866\text{ J}$ vs $0.0855\text{ J}$).
 - **Stochastic Regime Regression (36 vs 26 Alive Nodes):** In stochastic Poisson harvesting ($\lambda = 2.0, q = 0.00015\text{ J}$), discrete arrival bursts cause realized harvest to periodically fall short of expected projections. Relays accepting forwarding tasks under optimistic lookahead projections deplete prematurely, leaving 26 surviving nodes compared to 36 under static shortest-path Dijkstra.
 
-### 3.4 Multi-Seed Statistical Validation ($N = 5$ Seeds, 350 Rounds)
-Evaluated across 5 independent topologies to eliminate random deployment bias:
-- **Solar Regime:** $\Delta E = -0.0865\text{ J}$ ($p = 0.0015$, statistically significant advantage for Unaware Dijkstra due to zero relay reception dissipation).
-- **Shadowed Solar:** $\Delta E = -0.0418\text{ J}$ ($p = 0.0066$, Unaware Dijkstra preserves higher aggregate energy).
-- **Stochastic Regime:** $\Delta E = -0.0095\text{ J}$ ($p = 0.910$, statistically indistinguishable aggregate energy).
-- **Conclusion:** Single-path maximin bottleneck optimality (Theorem 1) does not automatically yield macroscopic network-level lifetime gains when uncoordinated cluster heads funnel traffic onto the same harvesting nodes.
+### 3.4 Multi-Seed Statistical Validation ($N = 30$ Seeds, 350 Rounds)
+Evaluated across 30 independent topologies (seeds 42, 7, 123, ..., 2026) to eliminate random deployment bias:
+- **Solar Regime:** $\Delta E = -0.0751\text{ J}$ (95% CI: $[-0.0829, -0.0673]$, paired $t = -18.89, p = 7.66 \times 10^{-18}$, Wilcoxon $W = 0, p = 1.86 \times 10^{-9}$). Unaware LEACH preserves more aggregate energy due to avoiding intermediate relay reception dissipation ($E_{\text{rx}}$).
+- **Shadowed Solar:** $\Delta E = -0.0380\text{ J}$ (95% CI: $[-0.0453, -0.0306]$, $p = 5.15 \times 10^{-11}$).
+- **Stochastic Regime:** $\Delta E = -0.0709\text{ J}$ (95% CI: $[-0.1321, -0.0097]$, $p = 0.0308$).
+- **Conclusion:** Single-path maximin bottleneck optimality (Theorem 1) provides worst-case path resilience, but macroscopic network energy depends on the multi-hop relay dissipation trade-off.
 
 ### 3.5 Scalability Benchmark ($N = 50 \to 500$ Nodes)
 Empirical latency scaling measurements confirm theoretical asymptotic complexity:

@@ -160,7 +160,7 @@ def run_heterogeneity_experiment():
     p_arr = np.array(shadow_probabilities)
     ax1.plot(p_arr, alive_unaware, 'o--', color='#d9534f', label='Unaware LEACH + Dijkstra (Alive Nodes)', linewidth=2)
     ax1.plot(p_arr, alive_time_dp, 's-', color='#2b6cb0', label='Time-Augmented DP (Alive Nodes)', linewidth=2.5)
-    ax1.set_xlabel('Spatial Heterogeneity (Shadow Occlusion Fraction $p_{\mathrm{shadow}}$)', fontsize=11)
+    ax1.set_xlabel(r'Spatial Heterogeneity (Shadow Occlusion Fraction $p_{\mathrm{shadow}}$)', fontsize=11)
     ax1.set_ylabel('Active Sensor Nodes at Round 350', fontsize=11)
     ax1.set_title('(A) Network Longevity vs. Harvesting Heterogeneity', fontsize=12, fontweight='bold')
     ax1.grid(True, linestyle=':', alpha=0.6)
@@ -170,7 +170,7 @@ def run_heterogeneity_experiment():
     # Subplot 2: Energy Advantage Margin
     ax2.bar(p_arr - 0.02, energy_unaware, width=0.04, label='Unaware Residual Energy (J)', color='#e57373', alpha=0.85)
     ax2.bar(p_arr + 0.02, energy_time_dp, width=0.04, label='Time-DP Residual Energy (J)', color='#4299e1', alpha=0.85)
-    ax2.set_xlabel('Spatial Heterogeneity (Shadow Occlusion Fraction $p_{\mathrm{shadow}}$)', fontsize=11)
+    ax2.set_xlabel(r'Spatial Heterogeneity (Shadow Occlusion Fraction $p_{\mathrm{shadow}}$)', fontsize=11)
     ax2.set_ylabel('Total Residual Energy at Round 350 (Joules)', fontsize=11)
     ax2.set_title('(B) Residual Energy Advantage Margin', fontsize=12, fontweight='bold')
     ax2.grid(True, linestyle=':', alpha=0.6)

@@ -68,17 +68,17 @@ When an intermediate relay exhausts battery mid-round during active forwarding:
 
 ## 📊 Experimental Results & Benchmarks
 
-### 1. Multi-Seed Statistical Evaluation ($N = 5$ Seeds, 350 Rounds)
+### 1. Multi-Seed Statistical Evaluation ($N = 30$ Seeds, 350 Rounds)
 
 | Configuration | First Node Death (FND) | Alive Nodes (Round 350) | Total Residual Energy |
 | :--- | :--- | :--- | :--- |
-| **1. Baseline (No Harvesting)** | $89.4 \pm 3.6$ | $0.4 \pm 0.5$ | $0.0002 \pm 0.0003\text{ J}$ |
-| **2. Solar (Unaware LEACH)** | $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | **$1.7131 \pm 0.0689\text{ J}$** |
-| **3. Solar (Adaptive Time-DP)** | $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | $1.6266 \pm 0.0811\text{ J}$ |
-| **4. Shadowed Solar (Unaware)** | **$107.8 \pm 7.3$** | **$23.6 \pm 3.4$** | **$0.3638 \pm 0.2138\text{ J}$** |
-| **5. Shadowed Solar (Time-DP)** | $105.4 \pm 4.0$ | $23.0 \pm 4.0$ | $0.3220 \pm 0.1987\text{ J}$ |
-| **6. Stochastic (Unaware LEACH)**| $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | **$15.8640 \pm 0.0990\text{ J}$** |
-| **7. Stochastic (Adaptive Time-DP)**| $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | $15.8545 \pm 0.1823\text{ J}$ |
+| **1. Baseline (No Harvesting)** | $89.2 \pm 5.4$ | $0.4 \pm 0.5$ | $0.0001 \pm 0.0002\text{ J}$ |
+| **2. Solar (Unaware LEACH)** | $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | **$1.7050 \pm 0.0813\text{ J}$** |
+| **3. Solar (Adaptive Time-DP)** | $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | $1.6299 \pm 0.0939\text{ J}$ |
+| **4. Shadowed Solar (Unaware)** | **$110.2 \pm 9.6$** | **$24.1 \pm 3.2$** | **$0.3900 \pm 0.1996\text{ J}$** |
+| **5. Shadowed Solar (Time-DP)** | $109.0 \pm 9.5$ | $23.7 \pm 3.8$ | $0.3521 \pm 0.1958\text{ J}$ |
+| **6. Stochastic (Unaware LEACH)**| $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | **$15.8599 \pm 0.1470\text{ J}$** |
+| **7. Stochastic (Adaptive Time-DP)**| $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | $15.7890 \pm 0.1527\text{ J}$ |
 
 ### 2. Theoretical vs. Network-Level Trade-Offs
 - **Single-Path Maximin Optimality (Theorem 1):** Proves Bellman optimality on time-expanded DAGs for worst-case bottleneck capacity, isolating recharging relays on targeted paths (5-node counterexample).

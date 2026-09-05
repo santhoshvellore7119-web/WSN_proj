@@ -63,8 +63,9 @@ def run_simulation_task(job_id: str, config: Dict[str, Any]):
             db = SessionLocal()
             existing = db.query(SimulationRun).filter(SimulationRun.job_id == job_id).first()
             if not existing:
+                from datetime import timezone
                 db_run = SimulationRun(
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
                     parameters=json.dumps(config),
                     summary=json.dumps(results.get("summary", {}) if results else {}),
                     results=json.dumps(results) if results else None,

@@ -238,9 +238,10 @@ class SimulatorWrapper:
                 }
             })
 
+        from datetime import timezone
         return {
             'scenarios': scenario_results,
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'seed': seed,
             'nodesCount': num_nodes,
             'maxRounds': max_rounds

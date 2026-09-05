@@ -390,51 +390,31 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
 
                 // Dynamic Link Color based on transmitter residual energy
                 const uEnergyRatio = uNode ? uNode.energyRatio : 1.0;
-                let linkColor = '#22c55e'; // Emerald
-                let pulseColor = '#4ade80';
+                let linkColor = '#10b981'; // Green
                 if (uEnergyRatio < 0.2) {
                   linkColor = '#ef4444'; // Red
-                  pulseColor = '#f87171';
                 } else if (uEnergyRatio < 0.5) {
                   linkColor = '#f59e0b'; // Amber
-                  pulseColor = '#fbbf24';
                 }
-
-                const midX = (uX + vX) / 2;
-                const midY = (uY + vY) / 2;
 
                 pathSegments.push(
                   <g key={`route-${chId}-${u}-${v}-${idx}`}>
-                    {/* Shadow / Halo Line */}
+                    {/* Clean Academic Route Line */}
                     <line
                       x1={uX}
                       y1={uY}
                       x2={vX}
                       y2={vY}
                       stroke={linkColor}
-                      strokeWidth="3.5"
-                      strokeOpacity="0.2"
+                      strokeWidth="1.75"
                       strokeLinecap="round"
                     />
-                    {/* Main Link Line */}
-                    <line
-                      x1={uX}
-                      y1={uY}
-                      x2={vX}
-                      y2={vY}
-                      stroke={linkColor}
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      opacity="0.9"
-                    />
-                    {/* Active Packet Transmission Pulse Dot */}
+                    {/* Directional Midpoint Marker */}
                     <circle
-                      cx={midX}
-                      cy={midY}
-                      r="2.2"
-                      fill={pulseColor}
-                      stroke="#000000"
-                      strokeWidth="0.5"
+                      cx={(uX + vX) / 2}
+                      cy={(uY + vY) / 2}
+                      r="1.75"
+                      fill={linkColor}
                     />
                   </g>
                 );
