@@ -37,10 +37,20 @@ def run_simulation_task(job_id: str, config: Dict[str, Any]):
         job_id: Unique identifier for the job
         config: Simulation configuration dictionary
     """
-    # Update job status
+    # 1. Update in-memory and SQLite to 'running'
     if job_id in jobs:
         jobs[job_id]["status"] = "running"
         jobs[job_id]["started_at"] = time.time()
+
+    try:
+        db = SessionLocal()
+        run = db.query(SimulationRun).filter(SimulationRun.job_id == job_id).first()
+        if run:
+            run.status = "running"
+            db.commit()
+        db.close()
+    except Exception as dbe:
+        print(f"Warning: Failed to update run {job_id} to running: {dbe}")
 
     try:
         # Create simulator wrapper and run simulation
@@ -52,17 +62,22 @@ def run_simulation_task(job_id: str, config: Dict[str, Any]):
         else:
             results = wrapper.run_simulation(config)
 
-        # Update in-memory job store
+        # 2. Update in-memory job store to 'completed'
         if job_id in jobs:
             jobs[job_id]["status"] = "completed"
             jobs[job_id]["results"] = results
             jobs[job_id]["completed_at"] = time.time()
 
-        # Auto-persist completed simulation run to SQLite database
+        # 3. Update SQLite record with completed results
         try:
             db = SessionLocal()
-            existing = db.query(SimulationRun).filter(SimulationRun.job_id == job_id).first()
-            if not existing:
+            run = db.query(SimulationRun).filter(SimulationRun.job_id == job_id).first()
+            if run:
+                run.status = "completed"
+                run.results = json.dumps(results)
+                run.summary = json.dumps(results.get("summary", {}) if results else {})
+                db.commit()
+            else:
                 from datetime import timezone
                 db_run = SimulationRun(
                     created_at=datetime.now(timezone.utc),
@@ -76,13 +91,23 @@ def run_simulation_task(job_id: str, config: Dict[str, Any]):
                 db.commit()
             db.close()
         except Exception as dbe:
-            print(f"Warning: Failed to auto-persist run {job_id} to SQLite: {dbe}")
+            print(f"Warning: Failed to persist completed run {job_id} to SQLite: {dbe}")
 
     except Exception as e:
-        # Update job with error
+        # 4. Update in-memory and SQLite with failure
         if job_id in jobs:
             jobs[job_id]["status"] = "failed"
             jobs[job_id]["error"] = str(e)
             jobs[job_id]["completed_at"] = time.time()
-        # In production, you'd want to log this error
+
+        try:
+            db = SessionLocal()
+            run = db.query(SimulationRun).filter(SimulationRun.job_id == job_id).first()
+            if run:
+                run.status = "failed"
+                run.summary = json.dumps({"error": str(e)})
+                db.commit()
+            db.close()
+        except Exception as dbe:
+            print(f"Warning: Failed to mark run {job_id} as failed in SQLite: {dbe}")
         print(f"Error in simulation task {job_id}: {e}")

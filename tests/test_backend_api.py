@@ -4,6 +4,8 @@ Unit tests for FastAPI backend routes using TestClient.
 
 import sys
 import os
+import json
+from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 # Add project root and backend path (do not add src at top level before fastapi initializes)
@@ -146,4 +148,70 @@ def test_csv_export_endpoint():
     assert "text/csv" in resp.headers["content-type"]
     assert "round,alive_nodes,total_energy_joules" in resp.text
     assert "1,10,5.000000" in resp.text
+
+
+def test_simulation_validation_bounds_rejection():
+    """Verify that out-of-bounds parameters are rejected with HTTP 422."""
+    # Test excessive node count
+    invalid_nodes_payload = {"nodes": 10000, "rounds": 100}
+    resp = client.post("/simulate", json=invalid_nodes_payload)
+    assert resp.status_code == 422
+    err_detail = resp.json()["detail"]
+    assert any("nodes" in str(err["loc"]) for err in err_detail)
+
+    # Test negative rounds
+    invalid_rounds_payload = {"nodes": 50, "rounds": -10}
+    resp = client.post("/simulate", json=invalid_rounds_payload)
+    assert resp.status_code == 422
+
+    # Test excessive max_dp_hops
+    invalid_hops_payload = {"nodes": 50, "rounds": 100, "max_dp_hops": 99}
+    resp = client.post("/simulate", json=invalid_hops_payload)
+    assert resp.status_code == 422
+
+
+def test_job_status_sqlite_fallback_and_recovery():
+    """Verify that jobs stored in SQLite can be queried even if memory cache is cleared."""
+    import uuid
+    from backend.db.session import SessionLocal
+    from backend.db.models import SimulationRun
+    from backend.main import jobs, lifespan
+    import asyncio
+
+    job_id = f"test-sql-recovery-{uuid.uuid4().hex[:8]}"
+    
+    # Insert dangling 'running' simulation directly in DB
+    db = SessionLocal()
+    try:
+        run = SimulationRun(
+            job_id=job_id,
+            status="running",
+            parameters=json.dumps({"nodes": 20, "rounds": 50}),
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(run)
+        db.commit()
+    finally:
+        db.close()
+
+    # Ensure memory dict does not contain it
+    if job_id in jobs:
+        del jobs[job_id]
+
+    # Status check should read from SQLite and return "running"
+    resp = client.get(f"/simulate/{job_id}/status")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "running"
+
+    # Test startup lifespan recovery marks it as "interrupted"
+    async def run_lifespan():
+        async with lifespan(app):
+            pass
+    asyncio.run(run_lifespan())
+
+    # Check updated status from SQLite
+    resp = client.get(f"/simulate/{job_id}/status")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "interrupted"
+
 

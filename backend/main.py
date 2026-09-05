@@ -1,7 +1,7 @@
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.responses import PlainTextResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from contextlib import asynccontextmanager
 import uuid
@@ -24,30 +24,53 @@ from db.models import SimulationRun
 from db.session import init_db, get_db_session, SessionLocal
 from tasks.simulation_tasks import set_job_store, run_simulation_task
 
-# Lifespan context manager replacing deprecated @app.on_event
+# Lifespan context manager: initializes SQLite database and cleans up interrupted jobs from previous server runs
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    
+    # Auto-recovery: Mark dangling in-flight jobs from prior crashes/restarts as interrupted
+    db = SessionLocal()
+    try:
+        dangling_runs = db.query(SimulationRun).filter(SimulationRun.status.in_(["pending", "running"])).all()
+        for run in dangling_runs:
+            run.status = "interrupted"
+            run.summary = json.dumps({"error": "Server restarted while simulation was in-flight"})
+        if dangling_runs:
+            db.commit()
+    except Exception as e:
+        print(f"Warning: Failed to recover dangling runs on startup: {e}")
+    finally:
+        db.close()
+
     yield
 
 app = FastAPI(
     title="WSN Energy-Harvesting Routing Simulator API",
-    description="API for running and managing WSN simulations with energy harvesting",
-    version="1.0.0",
+    description="Production-grade API for simulating and managing energy-harvesting wireless sensor networks",
+    version="2.0.0",
     lifespan=lifespan
 )
 
-# Configure CORS with explicit local development origins
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# Configure CORS dynamically with environment override (defaulting to local development origins)
+cors_env = os.getenv("CORS_ORIGINS", "").strip()
+if cors_env == "*":
+    allowed_origins = ["*"]
+elif cors_env:
+    allowed_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+else:
+    allowed_origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:8000",
         "http://127.0.0.1:8000"
-    ],
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -57,27 +80,27 @@ app.add_middleware(
 jobs: Dict[str, Dict] = {}
 set_job_store(jobs)
 
-# Pydantic models for request/response
+# Pydantic models with server-side bounds validation
 class SimulationConfig(BaseModel):
-    nodes: int = 50
-    rounds: int = 200
-    area: float = 100.0
-    init_energy: float = 1.0
-    max_capacity: float = 2.0
-    cluster_ratio: float = 0.06
-    bs_x: float = 50.0
-    bs_y: float = 50.0
-    harvesting_profile: Optional[str] = "solar"
-    solar_peak: float = 0.03
-    stoch_lambda: float = 2.0
-    stoch_quantum: float = 0.005
+    nodes: int = Field(50, ge=3, le=500, description="Number of sensor nodes in the network (3 - 500)")
+    rounds: int = Field(200, ge=1, le=2000, description="Simulation duration in discrete rounds (1 - 2000)")
+    area: float = Field(100.0, ge=10.0, le=1000.0, description="Simulation field dimension in meters (10m - 1000m)")
+    init_energy: float = Field(1.0, ge=0.001, le=100.0, description="Initial battery capacity in Joules (0.001J - 100J)")
+    max_capacity: float = Field(2.0, ge=0.001, le=100.0, description="Maximum battery capacity in Joules (0.001J - 100J)")
+    cluster_ratio: float = Field(0.06, ge=0.01, le=0.5, description="Target cluster head percentage (1% - 50%)")
+    bs_x: float = Field(50.0, description="Base station X position coordinate")
+    bs_y: float = Field(50.0, description="Base station Y position coordinate")
+    harvesting_profile: Optional[str] = Field("solar", description="Harvesting regime: none, constant, solar, stochastic, trace, shadowed_solar")
+    solar_peak: float = Field(0.03, ge=0.0, le=10.0, description="Peak solar harvest rate in Joules per round")
+    stoch_lambda: float = Field(2.0, ge=0.0, le=100.0, description="Poisson arrival parameter lambda")
+    stoch_quantum: float = Field(0.005, ge=0.0, le=10.0, description="Energy per arrival quantum in Joules")
     disable_time_dp: bool = False
     disable_harvesting_ch: bool = False
     disable_live_reroute: bool = False
-    max_dp_hops: int = 5
-    routing_algorithm: str = "dijkstra"
-    seed: Optional[int] = 42
-    visualize: bool = True
+    max_dp_hops: int = Field(5, ge=1, le=15, description="Maximum multi-hop routing lookahead depth (1 - 15)")
+    routing_algorithm: str = Field("dijkstra", description="Routing strategy: dijkstra, energy_dijkstra, astar, dp_maximin, dp_time_augmented")
+    seed: Optional[int] = Field(42, description="Pseudorandom generator seed")
+    visualize: bool = False
 
 class SimulationResponse(BaseModel):
     job_id: str
@@ -93,30 +116,49 @@ class SimulationResultResponse(BaseModel):
     completed_at: Optional[datetime] = None
 
 class ScalabilityRequest(BaseModel):
-    node_counts: Optional[List[int]] = [30, 50, 80, 120, 160]
-    rounds: int = 150
+    node_counts: Optional[List[int]] = Field([30, 50, 80, 120, 160], description="List of node counts to benchmark")
+    rounds: int = Field(150, ge=1, le=1000)
     seed: int = 42
 
 class HeterogeneityRequest(BaseModel):
-    shadow_fractions: Optional[List[float]] = [0.1, 0.3, 0.5, 0.7, 0.9]
-    nodes: int = 50
-    rounds: int = 200
+    shadow_fractions: Optional[List[float]] = Field([0.1, 0.3, 0.5, 0.7, 0.9], description="List of shadow fractions")
+    nodes: int = Field(50, ge=10, le=200)
+    rounds: int = Field(200, ge=1, le=1000)
     seed: int = 42
 
 @app.post("/simulate", response_model=SimulationResponse)
 async def start_simulation(config: SimulationConfig, background_tasks: BackgroundTasks):
-    """Start a new simulation run."""
+    """Start a new simulation run with persistent SQLite tracking."""
     job_id = str(uuid.uuid4())
     cfg_dict = config.model_dump()
+    now = datetime.now(timezone.utc)
 
+    # 1. Update in-memory job store
     jobs[job_id] = {
         "status": "pending",
         "config": cfg_dict,
-        "created_at": datetime.now(timezone.utc),
+        "created_at": now,
         "completed_at": None,
         "results": None,
         "error": None
     }
+
+    # 2. Persist immediately to SQLite database
+    try:
+        db = SessionLocal()
+        db_run = SimulationRun(
+            created_at=now,
+            parameters=json.dumps(cfg_dict),
+            summary=json.dumps({}),
+            results=None,
+            status="pending",
+            job_id=job_id
+        )
+        db.add(db_run)
+        db.commit()
+        db.close()
+    except Exception as e:
+        print(f"Warning: Failed to create pending record for {job_id} in SQLite: {e}")
 
     background_tasks.add_task(run_simulation_task, job_id, cfg_dict)
 
@@ -128,36 +170,46 @@ async def start_simulation(config: SimulationConfig, background_tasks: Backgroun
 
 @app.get("/simulate/{job_id}/status", response_model=SimulationResultResponse)
 async def get_simulation_status(job_id: str):
-    """Get the status of a simulation job."""
-    if job_id not in jobs:
-        # Check SQLite database for completed job
-        db = SessionLocal()
-        run = db.query(SimulationRun).filter(SimulationRun.job_id == job_id).first()
-        db.close()
-        if run:
-            try:
-                res = json.loads(run.results) if run.results else None
-            except Exception:
-                res = None
-            return SimulationResultResponse(
-                job_id=job_id,
-                status=run.status,
-                results=res,
-                error=None,
-                created_at=run.created_at,
-                completed_at=run.created_at
-            )
-        raise HTTPException(status_code=404, detail="Job not found")
+    """Get the status of a simulation job from in-memory cache or persistent SQLite database."""
+    if job_id in jobs:
+        job = jobs[job_id]
+        return SimulationResultResponse(
+            job_id=job_id,
+            status=job["status"],
+            results=job["results"],
+            error=job.get("error"),
+            created_at=job["created_at"],
+            completed_at=datetime.fromtimestamp(job["completed_at"], tz=timezone.utc) if job.get("completed_at") else None
+        )
 
-    job = jobs[job_id]
-    return SimulationResultResponse(
-        job_id=job_id,
-        status=job["status"],
-        results=job["results"],
-        error=job["error"],
-        created_at=job["created_at"],
-        completed_at=job["completed_at"]
-    )
+    # Check SQLite database for completed, failed, or interrupted job
+    db = SessionLocal()
+    run = db.query(SimulationRun).filter(SimulationRun.job_id == job_id).first()
+    db.close()
+    if run:
+        try:
+            res = json.loads(run.results) if run.results else None
+        except Exception:
+            res = None
+        
+        err_msg = None
+        if run.status in ("failed", "interrupted") and run.summary:
+            try:
+                summary_data = json.loads(run.summary)
+                err_msg = summary_data.get("error")
+            except Exception:
+                err_msg = run.summary
+
+        return SimulationResultResponse(
+            job_id=job_id,
+            status=run.status,
+            results=res,
+            error=err_msg,
+            created_at=run.created_at,
+            completed_at=run.created_at
+        )
+
+    raise HTTPException(status_code=404, detail="Simulation job not found")
 
 def generate_csv_from_results(results: Dict[str, Any]) -> str:
     summary = results.get("summary", {})

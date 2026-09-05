@@ -128,6 +128,9 @@ python run_scalability_benchmark.py
 
 # Run real solar trace replay (NREL data)
 python run_real_trace_experiment.py
+
+# Run real-world Great Duck Island deployment case study
+python run_real_world_case_study.py
 ```
 
 ### 3. Option B: Launch FastAPI + React Web App
@@ -193,10 +196,10 @@ wsn-energy-routing/
 │   ├── first_review_report.pdf
 │   ├── time_augmented_dp_summary.md
 │   └── convert_to_pdf.py
-├── tests/                   # Pytest verification suite (46 tests)
+├── tests/                   # Pytest verification suite (52 tests)
 ├── results/                 # Output plots and benchmark CSVs
 ├── Dockerfile.backend       # FastAPI container definition
-├── Dockerfile.frontend      # React / Nginx container definition
+├── Dockerfile.frontend      # React / Express production container definition
 ├── docker-compose.yml       # Multi-container service definition
 ├── requirements.txt         # Python dependencies
 ├── LICENSE                  # MIT License

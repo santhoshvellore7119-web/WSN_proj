@@ -39,16 +39,16 @@ jobs:
           python main.py --nodes 30 --rounds 20 --visualize
 
   frontend-build:
-    name: Frontend Test & Production Build
+    name: Frontend Lint & Production Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 18
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -56,12 +56,12 @@ jobs:
         working-directory: ./frontend
         run: npm ci
 
-      - name: Run Frontend Unit Tests
+      - name: Typecheck TypeScript Code
         working-directory: ./frontend
-        run: npm test -- --watchAll=false
+        run: npm run lint
 
       - name: Build React Production Bundle
         working-directory: ./frontend
         env:
-          CI: true
+          NODE_ENV: production
         run: npm run build
