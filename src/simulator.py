@@ -86,9 +86,13 @@ class Simulator:
         self.alive_nodes_history: List[int] = []
         self.total_energy_history: List[float] = []
         self.harvested_energy_history: List[float] = []
+        self.consumed_energy_history: List[float] = []
         self.cluster_heads_history: List[List[int]] = []
+        self.cluster_assignments_history: List[Dict[int, int]] = []
         self.routes_history: List[Dict[int, Tuple[Optional[List[int]], float]]] = []
         self.reroute_events_history: List[int] = []
+        self.fairness_history: List[float] = []
+        self.pdr_history: List[float] = []
         self.energy_matrix: List[List[float]] = []  # shape: [round, node_index]
 
         self.first_node_death_round: Optional[int] = None
@@ -152,6 +156,7 @@ class Simulator:
             lookahead_rounds=1,
             rng=self._rng
         )
+        self.cluster_assignments_history.append(dict(cluster_assignment))
 
         for nid, node in self.nodes.items():
             if not node.is_alive:
@@ -311,8 +316,23 @@ class Simulator:
         num_alive = len(alive_nodes)
         total_energy = sum(self.nodes[nid].residual_energy for nid in alive_nodes)
 
+        # Calculate energy consumed this round (from nodes)
+        last_tot = self.total_energy_history[-1] if self.total_energy_history else (self.num_nodes * self.initial_energy)
+        round_consumed = max(0.0, (last_tot + round_harvested_total) - total_energy)
+
+        # Jain's fairness index across active and inactive nodes
+        energies = [self.nodes[i].residual_energy for i in range(self.num_nodes)]
+        sum_e = sum(energies)
+        sum_sq = sum(e * e for e in energies)
+        fairness = (sum_e ** 2) / (self.num_nodes * sum_sq) if sum_sq > 0 else 1.0
+
+        pdr = num_alive / self.num_nodes if self.num_nodes > 0 else 0.0
+
         self.alive_nodes_history.append(num_alive)
         self.total_energy_history.append(total_energy)
+        self.consumed_energy_history.append(round_consumed)
+        self.fairness_history.append(round(fairness, 4))
+        self.pdr_history.append(round(pdr, 4))
         self.cluster_heads_history.append(list(cluster_heads))
         self.routes_history.append(routes)
 

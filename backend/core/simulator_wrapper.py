@@ -112,8 +112,11 @@ class SimulatorWrapper:
         )
 
         # Run simulation
+        import time
+        t_start = time.perf_counter()
         max_rounds = config.get('rounds', 200)
         sim.run(max_rounds=max_rounds, verbose=False)
+        t_duration_ms = (time.perf_counter() - t_start) * 1000.0
 
         # Prepare results
         results = {
@@ -122,25 +125,36 @@ class SimulatorWrapper:
                 'completed_rounds': sim.round_number,
                 'first_node_death_round': sim.first_node_death_round,
                 'half_nodes_dead_round': sim.half_nodes_dead_round,
+                'last_node_death_round': sim.last_node_death_round,
                 'final_alive_nodes': sim.alive_nodes_history[-1] if sim.alive_nodes_history else 0,
                 'total_nodes': sim.num_nodes,
                 'final_total_energy': sim.total_energy_history[-1] if sim.total_energy_history else 0.0,
-                'simulation_time': 0.0  # Would need to track this in simulator
+                'total_harvested_energy': sum(sim.harvested_energy_history),
+                'total_consumed_energy': sum(getattr(sim, 'consumed_energy_history', [0.0])),
+                'total_reroutes': sum(sim.reroute_events_history),
+                'network_lifetime_efficiency': (sim.alive_nodes_history[-1] / sim.num_nodes * 100.0) if sim.alive_nodes_history and sim.num_nodes > 0 else 0.0,
+                'average_pdr': (sum(sim.pdr_history) / len(sim.pdr_history)) if getattr(sim, 'pdr_history', None) else 1.0,
+                'jains_fairness_final': sim.fairness_history[-1] if getattr(sim, 'fairness_history', None) else 1.0,
+                'execution_time_ms': round(t_duration_ms, 2)
             },
 
-            # Time-series data (sample every N rounds to keep payload manageable)
+            # Time-series data
             'time_series': {
                 'rounds': list(range(1, len(sim.alive_nodes_history) + 1)),
                 'alive_nodes': sim.alive_nodes_history,
                 'total_energy': sim.total_energy_history,
                 'harvested_energy': sim.harvested_energy_history,
-                'reroute_events': sim.reroute_events_history
+                'consumed_energy': getattr(sim, 'consumed_energy_history', [0.0] * len(sim.alive_nodes_history)),
+                'reroute_events': sim.reroute_events_history,
+                'fairness_index': getattr(sim, 'fairness_history', [1.0] * len(sim.alive_nodes_history)),
+                'pdr_history': getattr(sim, 'pdr_history', [1.0] * len(sim.alive_nodes_history))
             },
 
-            # Detailed data for visualization (sampled)
+            # Detailed data for visualization
             'detailed_data': {
                 'energy_matrix': sim.energy_matrix,  # [round, node]
                 'cluster_heads_history': sim.cluster_heads_history,
+                'cluster_assignments_history': getattr(sim, 'cluster_assignments_history', []),
                 'routes_history': sim.routes_history,
                 'node_positions': {
                     str(node_id): {
@@ -149,7 +163,13 @@ class SimulatorWrapper:
                     }
                     for node_id, node in sim.nodes.items()
                 },
-                'base_station_position': list(base_station_pos)
+                'node_shadow_multipliers': {
+                    str(node_id): mult
+                    for node_id, mult in getattr(sim.harvesting_model, 'shadow_multipliers', {}).items()
+                } if hasattr(sim, 'harvesting_model') and hasattr(sim.harvesting_model, 'shadow_multipliers') else {},
+                'base_station_position': list(base_station_pos),
+                'fnd_round': sim.first_node_death_round,
+                'hnd_round': sim.half_nodes_dead_round
             },
 
             # Configuration used
@@ -158,7 +178,7 @@ class SimulatorWrapper:
 
         return results
 
-    def run_benchmark(self, num_nodes: int = 50, max_rounds: int = 300, seed: int = 42) -> Dict[str, Any]:
+    def run_benchmark(self, num_nodes: int = 40, max_rounds: int = 200, seed: int = 42) -> Dict[str, Any]:
         """
         Run structured comparative benchmark scenarios using core Simulator.
         """
@@ -170,49 +190,63 @@ class SimulatorWrapper:
                 'name': 'Baseline (No Harvesting, LEACH + Dijkstra)',
                 'category': 'Baseline',
                 'strategy': 'Unaware',
-                'kwargs': dict(harvesting_profile=None, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False)
+                'kwargs': dict(harvesting_profile=None, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False, routing_algorithm='dijkstra')
             },
             {
                 'id': 'solar_unaware',
                 'name': 'Solar Diurnal — Unaware (LEACH + Dijkstra)',
                 'category': 'Synchronous Solar',
                 'strategy': 'Unaware',
-                'kwargs': dict(harvesting_profile='solar', harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5, 'seed': seed}, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False)
+                'kwargs': dict(harvesting_profile='solar', harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5, 'seed': seed}, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False, routing_algorithm='dijkstra')
+            },
+            {
+                'id': 'solar_energy_aware',
+                'name': 'Solar Diurnal — Energy-Aware (LEACH + Energy-Dijkstra)',
+                'category': 'Synchronous Solar',
+                'strategy': 'Energy-Aware',
+                'kwargs': dict(harvesting_profile='solar', harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5, 'seed': seed}, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False, routing_algorithm='energy_dijkstra')
             },
             {
                 'id': 'solar_adaptive',
                 'name': 'Solar Diurnal — Adaptive (Time-DP + EH-LEACH + DSU)',
                 'category': 'Synchronous Solar',
                 'strategy': 'Adaptive (Time-DP + DSU)',
-                'kwargs': dict(harvesting_profile='solar', harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5, 'seed': seed}, enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True, max_dp_hops=5)
+                'kwargs': dict(harvesting_profile='solar', harvesting_kwargs={'peak_rate': 0.0006, 'period': 24, 'day_fraction': 0.5, 'seed': seed}, enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True, max_dp_hops=5, routing_algorithm='dp_time_augmented')
             },
             {
                 'id': 'shadow_unaware',
                 'name': 'Canopy Shade — Unaware (LEACH + Dijkstra)',
                 'category': 'Shadowed Solar',
                 'strategy': 'Unaware',
-                'kwargs': dict(harvesting_profile='heterogeneous_shadowed', harvesting_kwargs={'shadow_fraction': 0.4, 'shadow_penalty': 0.1, 'peak_rate': 0.0012, 'seed': seed}, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False)
+                'kwargs': dict(harvesting_profile='heterogeneous_shadowed', harvesting_kwargs={'shadow_fraction': 0.4, 'shadow_penalty': 0.1, 'peak_rate': 0.0012, 'seed': seed}, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False, routing_algorithm='dijkstra')
+            },
+            {
+                'id': 'shadow_energy_aware',
+                'name': 'Canopy Shade — Energy-Aware (LEACH + Energy-Dijkstra)',
+                'category': 'Shadowed Solar',
+                'strategy': 'Energy-Aware',
+                'kwargs': dict(harvesting_profile='heterogeneous_shadowed', harvesting_kwargs={'shadow_fraction': 0.4, 'shadow_penalty': 0.1, 'peak_rate': 0.0012, 'seed': seed}, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False, routing_algorithm='energy_dijkstra')
             },
             {
                 'id': 'shadow_adaptive',
                 'name': 'Canopy Shade — Adaptive (Time-DP + EH-LEACH + DSU)',
                 'category': 'Shadowed Solar',
                 'strategy': 'Adaptive (Time-DP + DSU)',
-                'kwargs': dict(harvesting_profile='heterogeneous_shadowed', harvesting_kwargs={'shadow_fraction': 0.4, 'shadow_penalty': 0.1, 'peak_rate': 0.0012, 'seed': seed}, enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True, max_dp_hops=5)
+                'kwargs': dict(harvesting_profile='heterogeneous_shadowed', harvesting_kwargs={'shadow_fraction': 0.4, 'shadow_penalty': 0.1, 'peak_rate': 0.0012, 'seed': seed}, enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True, max_dp_hops=5, routing_algorithm='dp_time_augmented')
             },
             {
                 'id': 'stoch_unaware',
                 'name': 'Stochastic Poisson — Unaware (LEACH + Dijkstra)',
                 'category': 'Stochastic Poisson',
                 'strategy': 'Unaware',
-                'kwargs': dict(harvesting_profile='stochastic', harvesting_kwargs={'lambda_rate': 2.0, 'quantum': 0.00015, 'seed': seed}, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False)
+                'kwargs': dict(harvesting_profile='stochastic', harvesting_kwargs={'lambda_rate': 2.0, 'quantum': 0.00015, 'seed': seed}, enable_time_dp=False, enable_harvesting_ch=False, enable_live_reroute=False, routing_algorithm='dijkstra')
             },
             {
                 'id': 'stoch_adaptive',
                 'name': 'Stochastic Poisson — Adaptive (Time-DP + EH-LEACH + DSU)',
                 'category': 'Stochastic Poisson',
                 'strategy': 'Adaptive (Time-DP + DSU)',
-                'kwargs': dict(harvesting_profile='stochastic', harvesting_kwargs={'lambda_rate': 2.0, 'quantum': 0.00015, 'seed': seed}, enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True, max_dp_hops=5)
+                'kwargs': dict(harvesting_profile='stochastic', harvesting_kwargs={'lambda_rate': 2.0, 'quantum': 0.00015, 'seed': seed}, enable_time_dp=True, enable_harvesting_ch=True, enable_live_reroute=True, max_dp_hops=5, routing_algorithm='dp_time_augmented')
             }
         ]
 
