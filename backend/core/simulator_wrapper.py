@@ -72,12 +72,24 @@ class SimulatorWrapper:
             harvesting_profile = None
             harvesting_kwargs = {}
 
-        # Feature toggles
-        enable_time_dp = not config.get('disable_time_dp', False)
+        # Feature toggles and algorithm mapping
+        routing_algorithm = config.get('routing_algorithm', 'dijkstra')
+        if routing_algorithm in ('dijkstra', 'energy_dijkstra', 'astar'):
+            enable_time_dp = False
+            enable_dp_routing = False
+        elif routing_algorithm == 'dp_maximin':
+            enable_time_dp = False
+            enable_dp_routing = True
+        elif routing_algorithm == 'dp_time_augmented':
+            enable_time_dp = True
+            enable_dp_routing = True
+        else:
+            enable_time_dp = not config.get('disable_time_dp', False)
+            enable_dp_routing = enable_time_dp
+
         enable_harvesting_ch = not config.get('disable_harvesting_ch', False)
         enable_live_reroute = not config.get('disable_live_reroute', False)
         max_dp_hops = config.get('max_dp_hops', 5)
-        routing_algorithm = config.get('routing_algorithm', 'dijkstra')
 
         # Create simulator instance
         sim = Simulator(
@@ -88,6 +100,7 @@ class SimulatorWrapper:
             initial_energy=initial_energy,
             max_battery_capacity=max_battery_capacity,
             desired_clusters_ratio=desired_clusters_ratio,
+            enable_dp_routing=enable_dp_routing,
             enable_time_dp=enable_time_dp,
             enable_harvesting_ch=enable_harvesting_ch,
             enable_live_reroute=enable_live_reroute,

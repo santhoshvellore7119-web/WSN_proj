@@ -63,17 +63,20 @@ class Graph:
 
     def __init__(self, nodes: Dict[int, Node]):
         self.nodes = nodes
+        self.distances: Dict[int, Dict[int, float]] = {nid: {} for nid in nodes}
         self.adjacency_list: Dict[int, List[Tuple[int, float]]] = {node_id: [] for node_id in nodes}
         self._build_adjacency_list()
 
     def _build_adjacency_list(self):
-        """Builds initial complete mesh between all nodes."""
+        """Builds initial complete mesh between all nodes with precomputed distances."""
         node_ids = list(self.nodes.keys())
         for i in range(len(node_ids)):
+            id_i = node_ids[i]
             for j in range(i + 1, len(node_ids)):
-                id_i = node_ids[i]
                 id_j = node_ids[j]
                 dist = self.nodes[id_i].distance_to(self.nodes[id_j])
+                self.distances[id_i][id_j] = dist
+                self.distances[id_j][id_i] = dist
                 self.adjacency_list[id_i].append((id_j, dist))
                 self.adjacency_list[id_j].append((id_i, dist))
 
@@ -83,7 +86,7 @@ class Graph:
         for node_id, neighbors in self.adjacency_list.items():
             updated_neighbors = []
             for neighbor_id, _ in neighbors:
-                dist = self.nodes[node_id].distance_to(self.nodes[neighbor_id])
+                dist = self.distances[node_id].get(neighbor_id, self.nodes[node_id].distance_to(self.nodes[neighbor_id]))
                 energy_cost = energy_model.transmit_energy(k, dist)
                 updated_neighbors.append((neighbor_id, energy_cost))
             self.adjacency_list[node_id] = updated_neighbors

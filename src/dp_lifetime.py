@@ -167,33 +167,44 @@ def dp_time_augmented_lifetime(
         time_horizon = max_hops * hop_delay
     time_horizon = max(hop_delay, time_horizon)
 
+    # Memoization cache for projected energy to avoid redundant trigonometric/harvest calculations
+    proj_cache: Dict[Tuple[int, int], float] = {}
+
     def get_projected_energy(nid: int, time_offset: int) -> float:
         if nid == -1:
             return float('inf')
+        cache_key = (nid, time_offset)
+        if cache_key in proj_cache:
+            return proj_cache[cache_key]
         node = nodes.get(nid)
         if node is None or not node.is_alive:
+            proj_cache[cache_key] = 0.0
             return 0.0
         if harvesting_model is None:
-            return node.residual_energy
-        return harvesting_model.project_energy(
-            node_id=nid,
-            current_energy=node.residual_energy,
-            current_time=current_time,
-            target_time=current_time + time_offset,
-            battery_capacity=node.max_energy
-        )
+            val = node.residual_energy
+        else:
+            val = harvesting_model.project_energy(
+                node_id=nid,
+                current_energy=node.residual_energy,
+                current_time=current_time,
+                target_time=current_time + time_offset,
+                battery_capacity=node.max_energy
+            )
+        proj_cache[cache_key] = val
+        return val
 
     # Relative tolerance used to treat two bottleneck values as "tied" for
     # cost-aware tie-breaking (see Cost-Aware Tie-Breaking note above).
     TIE_REL_TOL = 0.01
+    rx_cost_fixed = energy_model.receive_energy(k_bits)
 
-    def edge_transmission_cost(u: int, v: int) -> float:
-        """Actual physical energy (J) spent moving one packet across hop u->v."""
-        if v == -1:
-            dist = ((nodes[u].x - base_station_pos[0]) ** 2 + (nodes[u].y - base_station_pos[1]) ** 2) ** 0.5
-            return energy_model.transmit_energy(k_bits, dist)
-        dist = nodes[u].distance_to(nodes[v])
-        return energy_model.transmit_energy(k_bits, dist) + energy_model.receive_energy(k_bits)
+    # Precompute base station distances and transmission reachability for all alive nodes
+    bs_reach: Dict[int, Tuple[bool, float]] = {}
+    for u in alive_nodes:
+        dist_bs = ((nodes[u].x - base_station_pos[0]) ** 2 + (nodes[u].y - base_station_pos[1]) ** 2) ** 0.5
+        can_bs = transmission_range is None or dist_bs <= transmission_range
+        tx_bs = energy_model.transmit_energy(k_bits, dist_bs)
+        bs_reach[u] = (can_bs, tx_bs)
 
     # 3D tables:
     # dp[node][hop][time_offset] = best bottleneck value
@@ -241,54 +252,54 @@ def dp_time_augmented_lifetime(
 
     # Propagate through hop and time dimensions
     for h in range(1, max_hops + 1):
-        for t in range(h * hop_delay, time_horizon + 1):
-            prev_t = t - hop_delay
-            candidates = reached_at.get((h - 1, prev_t), [])
-            if not candidates:
+        prev_t = (h - 1) * hop_delay
+        t = h * hop_delay
+        if t > time_horizon:
+            break
+        candidates = reached_at.get((h - 1, prev_t), [])
+        if not candidates:
+            continue
+
+        for u in candidates:
+            bottleneck_u = dp[u][h - 1][prev_t]
+            if bottleneck_u <= 0.0:
                 continue
 
-            for u in candidates:
-                bottleneck_u = dp[u][h - 1][prev_t]
-                if bottleneck_u <= 0.0:
-                    continue
+            cost_u = dp_cost[u][h - 1][prev_t]
 
-                # Forward to neighboring sensor nodes
-                if u in adj_list:
-                    for v, _ in adj_list[u]:
-                        if v not in alive_nodes or v == source:
-                            continue
-                        dist_uv = ((nodes[u].x - nodes[v].x)**2 + (nodes[u].y - nodes[v].y)**2)**0.5
-                        if transmission_range is not None and dist_uv > transmission_range:
-                            continue
+            # Forward to neighboring sensor nodes
+            if u in adj_list:
+                u_node = nodes[u]
+                for v, _ in adj_list[u]:
+                    if v not in alive_nodes or v == source:
+                        continue
+                    v_node = nodes[v]
+                    dist_uv = u_node.distance_to(v_node)
+                    if transmission_range is not None and dist_uv > transmission_range:
+                        continue
 
-                        # Physical energy check: u must afford transmission, v must afford reception
-                        tx_cost_uv = energy_model.transmit_energy(k_bits, dist_uv)
-                        rx_cost_v = energy_model.receive_energy(k_bits)
-                        if bottleneck_u <= tx_cost_uv:
-                            continue
+                    # Physical energy check: u must afford transmission, v must afford reception
+                    tx_cost_uv = energy_model.transmit_energy(k_bits, dist_uv)
+                    if bottleneck_u <= tx_cost_uv:
+                        continue
 
-                        e_proj_v = get_projected_energy(v, t)
-                        avail_v = e_proj_v - rx_cost_v
-                        # Relay v must have sufficient residual reserve to avoid immediate exhaustion
-                        if avail_v <= rx_cost_v * 0.5:
-                            continue
+                    e_proj_v = get_projected_energy(v, t)
+                    avail_v = e_proj_v - rx_cost_fixed
+                    if avail_v <= rx_cost_fixed * 0.5:
+                        continue
 
-                        candidate_val = min(bottleneck_u, avail_v)
-                        candidate_cost = dp_cost[u][h - 1][prev_t] + edge_transmission_cost(u, v)
-                        update_dp(v, h, t, candidate_val, candidate_cost, u, prev_t)
+                    candidate_val = min(bottleneck_u, avail_v)
+                    edge_cost = tx_cost_uv + rx_cost_fixed
+                    candidate_cost = cost_u + edge_cost
+                    update_dp(v, h, t, candidate_val, candidate_cost, u, prev_t)
 
-                # Forward directly to base station (-1)
-                if u in alive_nodes:
-                    can_reach_bs = True
-                    if transmission_range is not None:
-                        dist_to_bs = ((nodes[u].x - base_station_pos[0])**2 + (nodes[u].y - base_station_pos[1])**2)**0.5
-                        if dist_to_bs > transmission_range:
-                            can_reach_bs = False
-                    if can_reach_bs:
-                        v = -1
-                        candidate_val = bottleneck_u  # base station has no energy constraint
-                        candidate_cost = dp_cost[u][h - 1][prev_t] + edge_transmission_cost(u, v)
-                        update_dp(v, h, t, candidate_val, candidate_cost, u, prev_t)
+            # Forward directly to base station (-1)
+            can_reach_bs, tx_cost_bs = bs_reach.get(u, (False, 0.0))
+            if can_reach_bs and bottleneck_u > tx_cost_bs:
+                v = -1
+                candidate_val = bottleneck_u  # base station has no energy constraint
+                candidate_cost = cost_u + tx_cost_bs
+                update_dp(v, h, t, candidate_val, candidate_cost, u, prev_t)
 
     # Find the best route ending at the base station, using the same
     # relative-tolerance cost tie-break as update_dp so the final pick is

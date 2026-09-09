@@ -33,9 +33,9 @@ export function useSimulation() {
 
       // Poll backend job status until completed
       let attempts = 0;
-      const maxAttempts = 240; // 60s timeout
+      const maxAttempts = 300; // 60s timeout
       while (attempts < maxAttempts) {
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 200));
         const statusRes = await fetch(`/api/simulate/${data.job_id}/status`);
         if (statusRes.ok) {
           const statusData = await statusRes.json();
