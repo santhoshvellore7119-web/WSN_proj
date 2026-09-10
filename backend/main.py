@@ -267,21 +267,29 @@ async def get_simulation_csv(job_id: str):
         headers={"Content-Disposition": f'attachment; filename="wsn_sim_{job_id[:8]}.csv"'}
     )
 
+class BenchmarkRequest(BaseModel):
+    nodes: Optional[int] = Field(40, ge=3, le=200, description="Node count for benchmark suite")
+    rounds: Optional[int] = Field(150, ge=1, le=1000, description="Max rounds for benchmark suite")
+    seed: Optional[int] = Field(42, description="Random seed")
+
 @app.post("/benchmark")
-async def run_benchmark(background_tasks: BackgroundTasks):
-    """Run the standard 5-scenario benchmark."""
+async def run_benchmark(background_tasks: BackgroundTasks, req: Optional[BenchmarkRequest] = None):
+    """Run the standard 5-scenario benchmark with parallelized scenario workers."""
     job_id = str(uuid.uuid4())
+    b_nodes = req.nodes if req and req.nodes else 40
+    b_rounds = req.rounds if req and req.rounds else 150
+    b_seed = req.seed if req and req.seed else 42
 
     jobs[job_id] = {
         "status": "pending",
-        "config": {"benchmark": True},
+        "config": {"benchmark": True, "nodes": b_nodes, "rounds": b_rounds, "seed": b_seed},
         "created_at": datetime.now(timezone.utc),
         "completed_at": None,
         "results": None,
         "error": None
     }
 
-    background_tasks.add_task(run_simulation_task, job_id, {"benchmark": True})
+    background_tasks.add_task(run_simulation_task, job_id, {"benchmark": True, "nodes": b_nodes, "rounds": b_rounds, "seed": b_seed})
 
     return SimulationResponse(
         job_id=job_id,
@@ -416,11 +424,12 @@ async def delete_run(run_id: str):
 
 @app.post("/experiments/scalability")
 async def run_scalability_experiment(req: ScalabilityRequest):
-    """Execute scalability benchmarks using core Python Simulator."""
+    """Execute scalability benchmarks in parallel across CPU threads."""
     import time
+    import concurrent.futures
     from simulator import Simulator
-    results = []
-    for n in (req.node_counts or [30, 50, 80, 120, 160]):
+
+    def _eval_node_count(n):
         sim_base = Simulator(
             num_nodes=n,
             area_width=100.0,
@@ -431,7 +440,7 @@ async def run_scalability_experiment(req: ScalabilityRequest):
             enable_live_reroute=False
         )
         t0 = time.perf_counter()
-        sim_base.run(max_rounds=req.rounds, verbose=False)
+        sim_base.run(max_rounds=req.rounds, verbose=False, save_log=False)
 
         sim_adapt = Simulator(
             num_nodes=n,
@@ -442,25 +451,32 @@ async def run_scalability_experiment(req: ScalabilityRequest):
             enable_harvesting_ch=True,
             enable_live_reroute=True
         )
-        sim_adapt.run(max_rounds=req.rounds, verbose=False)
+        sim_adapt.run(max_rounds=req.rounds, verbose=False, save_log=False)
         runtime = (time.perf_counter() - t0) * 1000.0
 
-        results.append({
+        return {
             "nodes": n,
             "baseline_fnd": sim_base.first_node_death_round,
             "baseline_alive": sim_base.alive_nodes_history[-1] if sim_base.alive_nodes_history else 0,
             "adaptive_fnd": sim_adapt.first_node_death_round,
             "adaptive_alive": sim_adapt.alive_nodes_history[-1] if sim_adapt.alive_nodes_history else 0,
             "computation_ms": round(runtime, 2)
-        })
+        }
+
+    node_counts = req.node_counts or [30, 50, 80, 120, 160]
+    loop = asyncio.get_running_loop()
+    max_w = min(len(node_counts), (os.cpu_count() or 4) * 2)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_w) as pool:
+        results = await loop.run_in_executor(None, lambda: list(pool.map(_eval_node_count, node_counts)))
     return results
 
 @app.post("/experiments/heterogeneity")
 async def run_heterogeneity_experiment(req: HeterogeneityRequest):
-    """Execute spatial heterogeneity sweep using core Python Simulator."""
+    """Execute spatial heterogeneity sweep in parallel across CPU threads."""
+    import concurrent.futures
     from simulator import Simulator
-    results = []
-    for p in (req.shadow_fractions or [0.1, 0.3, 0.5, 0.7, 0.9]):
+
+    def _eval_shadow_fraction(p):
         sim_u = Simulator(
             num_nodes=req.nodes,
             seed=req.seed,
@@ -470,7 +486,7 @@ async def run_heterogeneity_experiment(req: HeterogeneityRequest):
             enable_harvesting_ch=False,
             enable_live_reroute=False
         )
-        sim_u.run(max_rounds=req.rounds, verbose=False)
+        sim_u.run(max_rounds=req.rounds, verbose=False, save_log=False)
 
         sim_dp = Simulator(
             num_nodes=req.nodes,
@@ -481,16 +497,22 @@ async def run_heterogeneity_experiment(req: HeterogeneityRequest):
             enable_harvesting_ch=True,
             enable_live_reroute=True
         )
-        sim_dp.run(max_rounds=req.rounds, verbose=False)
+        sim_dp.run(max_rounds=req.rounds, verbose=False, save_log=False)
 
-        results.append({
+        return {
             "shadowFraction": p,
             "unaware_fnd": sim_u.first_node_death_round,
             "adaptive_fnd": sim_dp.first_node_death_round,
             "unaware_alive": sim_u.alive_nodes_history[-1] if sim_u.alive_nodes_history else 0,
             "adaptive_alive": sim_dp.alive_nodes_history[-1] if sim_dp.alive_nodes_history else 0,
             "energyRetainedJ": round(sim_dp.total_energy_history[-1] if sim_dp.total_energy_history else 0.0, 4)
-        })
+        }
+
+    shadow_fractions = req.shadow_fractions or [0.1, 0.3, 0.5, 0.7, 0.9]
+    loop = asyncio.get_running_loop()
+    max_w = min(len(shadow_fractions), (os.cpu_count() or 4) * 2)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_w) as pool:
+        results = await loop.run_in_executor(None, lambda: list(pool.map(_eval_shadow_fraction, shadow_fractions)))
     return results
 
 @app.get("/health")

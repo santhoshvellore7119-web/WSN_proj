@@ -19,12 +19,12 @@ export const ExperimentsView: React.FC<ExperimentsViewProps> = () => {
 
   const handleRunDensitySweep = async () => {
     setLoading(true);
-    setProgress('Executing node density sweep on backend simulator (30 → 160 nodes)...');
+    setProgress('Executing node density sweep on backend simulator (30 → 120 nodes)...');
     try {
       const res = await fetch('/api/experiments/scalability', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ node_counts: [30, 50, 80, 120, 160], rounds: 200, seed: 42 })
+        body: JSON.stringify({ node_counts: [30, 50, 80, 120], rounds: 100, seed: 42 })
       });
       if (!res.ok) throw new Error('Scalability sweep request failed');
       const data = await res.json();
@@ -44,7 +44,7 @@ export const ExperimentsView: React.FC<ExperimentsViewProps> = () => {
       const res = await fetch('/api/experiments/heterogeneity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shadow_fractions: [0.1, 0.3, 0.5, 0.7, 0.9], nodes: 50, rounds: 250, seed: 42 })
+        body: JSON.stringify({ shadow_fractions: [0.1, 0.3, 0.5, 0.7, 0.9], nodes: 40, rounds: 100, seed: 42 })
       });
       if (!res.ok) throw new Error('Heterogeneity sweep request failed');
       const data = await res.json();
@@ -107,7 +107,7 @@ export const ExperimentsView: React.FC<ExperimentsViewProps> = () => {
           <div className="bg-[#050608] border border-[#1b1d26] p-3 rounded flex items-center justify-between">
             <div>
               <h3 className="text-xs font-semibold text-slate-200">
-                Network Density Sweep (30 → 160 Sensor Nodes)
+                Network Density Sweep (30 → 120 Sensor Nodes)
               </h3>
               <p className="text-[11px] text-slate-400 mt-0.5">
                 Compares Baseline LEACH vs Proposed Time-DP + EH-LEACH across dense field deployments.

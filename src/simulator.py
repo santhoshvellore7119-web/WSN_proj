@@ -345,7 +345,7 @@ class Simulator:
 
         return num_alive > 0
 
-    def run(self, max_rounds: int = 1000, verbose: bool = True):
+    def run(self, max_rounds: int = 1000, verbose: bool = True, save_log: bool = False):
         """Runs the simulation until maximum rounds reached or all nodes die."""
         if verbose:
             print(f"Starting simulation: {self.num_nodes} nodes, max {max_rounds} rounds.")
@@ -364,7 +364,8 @@ class Simulator:
                 break
         elapsed = time.time() - start_time
 
-        self._save_simulation_log()
+        if save_log:
+            self._save_simulation_log()
 
         if verbose:
             print("\n--- Simulation Summary ---")

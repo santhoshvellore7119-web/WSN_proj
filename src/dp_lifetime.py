@@ -59,7 +59,7 @@ def dp_lifetime_maximin_path(
                     if v not in alive_nodes or v == source:
                         continue
                     if transmission_range is not None:
-                        dist_uv = ((nodes[u].x - nodes[v].x)**2 + (nodes[u].y - nodes[v].y)**2)**0.5
+                        dist_uv = nodes[u].distance_to(nodes[v])
                         if dist_uv > transmission_range:
                             continue
                     candidate = min(bottleneck_u, nodes[v].residual_energy)

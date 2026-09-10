@@ -250,8 +250,10 @@ class SimulatorWrapper:
             }
         ]
 
-        scenario_results = []
-        for s in scenarios_defs:
+        from datetime import timezone
+        import concurrent.futures
+
+        def _run_single_scenario(s):
             sim = Simulator(
                 num_nodes=num_nodes,
                 area_width=100.0,
@@ -262,9 +264,9 @@ class SimulatorWrapper:
                 seed=seed,
                 **s['kwargs']
             )
-            sim.run(max_rounds=max_rounds, verbose=False)
+            sim.run(max_rounds=max_rounds, verbose=False, save_log=False)
 
-            scenario_results.append({
+            return {
                 'id': s['id'],
                 'name': s['name'],
                 'category': s['category'],
@@ -283,9 +285,12 @@ class SimulatorWrapper:
                     'aliveNodes': sim.alive_nodes_history,
                     'totalEnergy': [round(e, 4) for e in sim.total_energy_history]
                 }
-            })
+            }
 
-        from datetime import timezone
+        max_workers = min(len(scenarios_defs), (os.cpu_count() or 4) * 2)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            scenario_results = list(executor.map(_run_single_scenario, scenarios_defs))
+
         return {
             'scenarios': scenario_results,
             'timestamp': datetime.now(timezone.utc).isoformat(),

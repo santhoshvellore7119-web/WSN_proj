@@ -58,7 +58,10 @@ def run_simulation_task(job_id: str, config: Dict[str, Any]):
 
         # Check if this is a benchmark request
         if config.get("benchmark"):
-            results = wrapper.run_benchmark()
+            b_nodes = config.get("nodes", 40)
+            b_rounds = config.get("rounds", 150)
+            b_seed = config.get("seed", 42)
+            results = wrapper.run_benchmark(num_nodes=b_nodes, max_rounds=b_rounds, seed=b_seed)
         else:
             results = wrapper.run_simulation(config)
 
