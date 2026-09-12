@@ -5,7 +5,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-LITERATURE_MD_CONTENT = """# Research Literature Analysis & Publication Blueprint (2020–2025)
+LITERATURE_MD_CONTENT = r"""# Research Literature Analysis & Publication Blueprint (2020–2025)
 
 **Project:** WSN Energy-Harvesting Routing Framework  
 **Author:** Santhosh  
@@ -46,16 +46,16 @@ Our framework directly addresses the primary limitations of the surveyed literat
   $$dp[v][h][t] = \\max_{u \\in \\text{nbr}(v)} \\min\\left(dp[u][h-1][t-\\delta], \\, E_{\\text{proj}}(v, t_{\\text{curr}} + t)\\right)$$
 - **Provable Guarantees:** Operates in strictly polynomial time $O(\|E\| \\cdot H \\cdot T)$ and space $O(\|V\| \\cdot H \\cdot T)$ (<50 kB memory), achieving a provable **$2\\epsilon$-approximation bound** under bounded stochastic arrival variance $\|\\xi\| \\le \\epsilon$.
 
-### Contribution 2: Instantaneous Fault Recovery via Disjoint-Set Union (DSU)
-- **Local Detour Splicing:** When an intermediate relay exhausts battery mid-round, the network executes a local detour search using Union-Find with path compression and rank optimization ($O(\\text{deg}(u) \\cdot \\alpha(V))$).
-- **Empirical Speedup:** Achieves a **$6.1\\times$ latency reduction** over global DP recomputation with 0% packet loss across failure rates up to 30%.
+### Contribution 2: Fast Fault Recovery via Disjoint-Set Union (DSU)
+- **Local Detour Splicing:** When an intermediate relay exhausts battery mid-round, the network verifies component connectivity in $O(|E| \\cdot \\alpha(V))$ and performs local detour splicing from the predecessor node in $O(\\text{deg}(u) \\cdot \\alpha(V))$ using Union-Find with path compression and rank optimization.
+- **Empirical Speedup:** Achieves a **$6.1\\times$ latency reduction** over global Time-DP recomputation with 0% packet loss across failure rates up to 30%.
 
 ### Contribution 3: Discovery of the Multi-Hop Relay Dissipation Trade-Off ($E_{\\text{rx}}$)
 - **The Reception Energy Penalty:** In dense networks, multi-hop routing incurs electronic reception dissipation ($E_{\\text{rx}} = k \\cdot E_{\\text{elec}}$) across intermediate relays. 
 - **Statistical Findings:** Under low/moderate occlusion, direct transmission preserves more aggregate energy. However, under extreme occlusion ($p_{\\text{shadow}} = 1.0$), lookahead Time-DP actively preserves vulnerable relays, extending First Node Death (FND) by **+6 rounds** (+1.2% residual energy gain) with statistical significance ($N=30$ seeds, $p < 10^{-8}$).
 
-### Contribution 4: Empirical Solar Trace Replay (NREL NSRDB Dataset)
-- Calibrated against 24-hour empirical solar irradiance data from the National Renewable Energy Laboratory (NREL), evaluating across clear, intermittent cloud, and overcast profiles rather than idealized constant rates.
+### Contribution 4: Calibrated Solar Trace Replay (NREL NSRDB Profiles)
+- Calibrated against 24-hour diurnal solar irradiance data derived from the National Renewable Energy Laboratory (NREL NSRDB), evaluating across clear sky, intermittent cloud, and overcast profiles rather than idealized constant rates.
 
 ---
 
@@ -66,9 +66,9 @@ Our framework directly addresses the primary limitations of the surveyed literat
 | **Recharge Lookahead** | ❌ None (Static Snapshot) | ~ Implicit (Trained Weights) | **✅ Exact 3D DP ($dp[v][h][t]$)** |
 | **Algorithmic Complexity** | $O(\|E\| + \|V\| \\log \|V\|)$ | Heavy iterative training | **Deterministic $O(\|E\| \\cdot H \\cdot T)$** |
 | **Microcontroller Feasibility**| ✅ High (<5 KB RAM) | ❌ Poor (>1 MB weights) | **✅ High (<50 KB RAM table)** |
-| **Mid-Round Fault Recovery** | ❌ Dropped packet / Full recompute | ❌ Retraining | **✅ Instant $O(\\text{deg}(u)\\alpha(V))$ DSU detour** |
+| **Mid-Round Fault Recovery** | ❌ Dropped packet / Full recompute | ❌ Retraining | **✅ $O(\|E\|\\alpha(V) + \\text{deg}(u)\\alpha(V))$ DSU detour** |
 | **Physical Radio Dissipation**| ❌ Often omitted | ❌ Idealized functions | **✅ 1st-order radio model ($E_{\\text{fs}} d^2 / E_{\\text{mp}} d^4$)** |
-| **Harvesting Realism** | Synthetic constant rate | Synthetic Poisson | **✅ NREL Empirical Solar Traces + Shadow Sweeps** |
+| **Harvesting Realism** | Synthetic constant rate | Synthetic Poisson | **✅ Calibrated NREL Solar Traces + Shadow Sweeps** |
 
 ---
 
@@ -482,11 +482,11 @@ def generate_literature_pdf(output_pdf_path: str = "report/literature_review_and
         bullet
     ))
 
-    story.append(Paragraph("<b>Contribution 2: Instantaneous Fault Recovery via Disjoint-Set Union (DSU)</b>", h2))
+    story.append(Paragraph("<b>Contribution 2: Fast Fault Recovery via Disjoint-Set Union (DSU)</b>", h2))
     story.append(Paragraph(
         "&bull; <b>Local Detour Splicing:</b> When an intermediate forwarder exhausts its battery mid-round, rather than recomputing the global 3D DP table "
-        "(<i>O(|E|HT)</i>) or dropping packets, the network performs a localized detour search using Union-Find with path compression and rank optimization.<br/>"
-        "&bull; <b>Empirical Speedup:</b> Achieves an exact <b>6.1&times; latency reduction</b> with 0% packet loss across failure rates up to 30%.",
+        "(<i>O(|E|HT)</i>) or dropping packets, the network verifies component connectivity in <i>O(|E|&alpha;(V))</i> and performs localized detour splicing from the predecessor node in <i>O(deg(u)&alpha;(V))</i> using Union-Find with path compression and rank optimization.<br/>"
+        "&bull; <b>Empirical Speedup:</b> Achieves an exact <b>6.1&times; latency reduction</b> over full 3D Time-DP recomputation with 0% packet loss across failure rates up to 30%.",
         bullet
     ))
 
@@ -499,10 +499,10 @@ def generate_literature_pdf(output_pdf_path: str = "report/literature_review_and
         bullet
     ))
 
-    story.append(Paragraph("<b>Contribution 4: Empirical Solar Trace Replay (NREL NSRDB Dataset)</b>", h2))
+    story.append(Paragraph("<b>Contribution 4: Calibrated Solar Trace Replay (NREL NSRDB Profiles)</b>", h2))
     story.append(Paragraph(
-        "&bull; Replaces simplistic constant or idealized sinusoidal models with calibrated 24-hour empirical solar irradiance data "
-        "from the National Renewable Energy Laboratory (NREL), evaluated across clear sky, intermittent cloud, and overcast profiles.",
+        "&bull; Replaces simplistic constant or idealized sinusoidal models with calibrated 24-hour diurnal solar irradiance profiles "
+        "derived from National Renewable Energy Laboratory (NREL NSRDB) datasets, evaluated across clear sky, intermittent cloud, and overcast profiles.",
         bullet
     ))
     story.append(Spacer(1, 4))
@@ -538,7 +538,7 @@ def generate_literature_pdf(output_pdf_path: str = "report/literature_review_and
             Paragraph("<b>Mid-Round Fault Recovery</b>", td_b),
             Paragraph("&times; Packet dropped / Full recompute", td),
             Paragraph("&times; Re-exploration / Retraining", td),
-            Paragraph("<b>&#10003; Instant O(deg(u)&middot;&alpha;(V)) DSU detour</b>", td_b)
+            Paragraph("<b>&#10003; O(|E|&alpha;(V) + deg(u)&alpha;(V)) DSU detour</b>", td_b)
         ],
         [
             Paragraph("<b>Physical Radio Dissipation</b>", td_b),
@@ -550,7 +550,7 @@ def generate_literature_pdf(output_pdf_path: str = "report/literature_review_and
             Paragraph("<b>Harvesting Realism</b>", td_b),
             Paragraph("Synthetic constant rate", td),
             Paragraph("Synthetic Poisson arrivals", td),
-            Paragraph("<b>&#10003; NREL Empirical Solar Traces + Shadow Sweeps</b>", td_b)
+            Paragraph("<b>&#10003; Calibrated NREL Solar Traces + Shadow Sweeps</b>", td_b)
         ]
     ]
 

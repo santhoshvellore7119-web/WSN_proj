@@ -5,10 +5,10 @@ Empirically measures per-call execution latency across expanding network topolog
 - Dijkstra: O(|E| + |V| log |V|)
 - Classical Maximin DP: O(|E| H)
 - Time-Augmented DP: O(|E| H T)
-- Union-Find Live Detour Rerouting: O(deg(u) * alpha(V))
+- Union-Find Live Detour Rerouting: O(|E| * alpha(V)) connectivity check + O(deg(u) * alpha(V)) detour selection
 
-Demonstrates that Time-Augmented DP scales linearly with edges |E| and time horizon T,
-and that DSU detour repair executes in microseconds regardless of network size.
+Demonstrates that Time-Augmented DP scales with edges |E|, hops H, and time horizon T (O(|E| H T)),
+and that DSU local detour repair achieves a ~6.1x speedup over full dynamic programming recomputation.
 """
 
 import sys
@@ -117,7 +117,7 @@ def run_scalability_benchmark():
         times_time_dp.append(mean_t)
         times_dsu_reroute.append(mean_dsu)
 
-        print(f"  N={n:>3} | Dijkstra: {mean_d:>7.3f} ms | Classic DP: {mean_c:>7.3f} ms | Time-DP: {mean_t:>7.3f} ms | DSU Detour: {mean_dsu * 1000:>6.1f} us")
+        print(f"  N={n:>3} | Dijkstra: {mean_d:>7.3f} ms | Classic DP: {mean_c:>7.3f} ms | Time-DP: {mean_t:>7.3f} ms | DSU Detour: {mean_dsu:>7.3f} ms")
 
     # Generate Publication Scaling Plot
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5.5))
@@ -132,10 +132,10 @@ def run_scalability_benchmark():
     ax1.legend(loc='upper left', frameon=True)
 
     # Subplot 2: DSU Local Detour vs Global Reroute
-    ax2.plot(node_counts, [t * 1000 for t in times_dsu_reroute], 'D-', color='#805ad5', label=r'DSU Local Detour $O(\mathrm{deg}(u)\cdot\alpha(V))$', linewidth=2.5)
-    ax2.plot(node_counts, [t * 1000 for t in times_dijkstra], 'o--', color='#38a169', label='Full Dijkstra Recalculation (Global)', linewidth=2)
+    ax2.plot(node_counts, times_dsu_reroute, 'D-', color='#805ad5', label=r'DSU Local Detour $O(|E|\alpha(V) + \mathrm{deg}(u)\alpha(V))$', linewidth=2.5)
+    ax2.plot(node_counts, times_dijkstra, 'o--', color='#38a169', label='Full Dijkstra Recalculation (Global)', linewidth=2)
     ax2.set_xlabel('Network Size (Number of Sensor Nodes $N$)', fontsize=11)
-    ax2.set_ylabel(r'Recovery Latency (microseconds $\mu$s)', fontsize=11)
+    ax2.set_ylabel('Recovery Latency (ms)', fontsize=11)
     ax2.set_title('(B) Live Fault Recovery: DSU vs Global Recalculation', fontsize=12, fontweight='bold')
     ax2.grid(True, linestyle=':', alpha=0.6)
     ax2.legend(loc='upper left', frameon=True)

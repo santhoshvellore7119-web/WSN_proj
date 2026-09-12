@@ -1,8 +1,8 @@
 """
-Real-World Empirical Case Study: Great Duck Island WSN Deployment
-==================================================================
-Simulates and evaluates multi-protocol routing over the classic Great Duck Island
-(GDI) habitat monitoring deployment scenario (Mainwaring et al., 2002; Szewczyk et al., 2004).
+Habitat Monitoring Case Study: Great Duck Island Topology & Occlusion
+======================================================================
+Simulates and evaluates multi-protocol routing parameterized by the classic
+Great Duck Island (GDI) habitat deployment specifications (Mainwaring et al., 2002; Szewczyk et al., 2004).
 
 Scenario Parameters:
 - Network Size: N = 32 Mica2/MicaDot sensor motes
@@ -32,7 +32,7 @@ from harvesting_model import create_shadowed_solar_profile
 
 def run_great_duck_island_case_study(seed=42):
     print("=" * 80)
-    print("EMPIRICAL CASE STUDY: GREAT DUCK ISLAND HABITAT MONITORING DEPLOYMENT")
+    print("CASE STUDY: GREAT DUCK ISLAND TOPOLOGY & CANOPY OCCLUSION SCENARIO")
     print("=" * 80)
     print("Topological Profile: N=32 nodes across 200m x 100m terrain")
     print("Harvesting Profile : Heterogeneous solar with spruce canopy occlusion (p_shadow=0.6)")

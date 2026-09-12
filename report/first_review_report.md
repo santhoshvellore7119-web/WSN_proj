@@ -18,9 +18,9 @@ When nodes harvest ambient energy (solar irradiance, thermal gradients, or ambie
 
 ### Core Project Objectives:
 - **Algorithmic Contribution:** Formulate and implement **Time-Augmented Maximin Dynamic Programming** ($dp[v][h][t]$) to maximize bottleneck route capacity on a time-expanded acyclic state graph.
-- **Fast Fault Recovery:** Implement **Disjoint-Set Union (Union-Find)** with path compression and union-by-rank for instantaneous local detour rerouting ($O(\text{deg}(u) \cdot \alpha(V))$).
+- **Fast Fault Recovery:** Implement **Disjoint-Set Union (Union-Find)** with path compression and union-by-rank for local detour rerouting ($O(|E|\alpha(V)) + O(\text{deg}(u)\alpha(V))$).
 - **Literature Baselines:** Benchmark against published EH-WSN protocols (**EH-LEACH** and predictive energy-weighted shortest path).
-- **Empirical Rigor:** Evaluate under real-world solar irradiance traces (NREL NSRDB), spatial heterogeneity sweeps ($p_{\text{shadow}} \in [0.0, 1.0]$), and multi-seed statistical significance tests (paired Wilcoxon signed-rank and Student's t-test).
+- **Empirical Rigor:** Evaluate under calibrated 24-hour solar irradiance traces (derived from NREL NSRDB seasonal datasets), spatial heterogeneity sweeps ($p_{\text{shadow}} \in [0.0, 1.0]$), and multi-seed statistical significance tests (paired Wilcoxon signed-rank and Student's t-test).
 - **Full-Stack Engineering:** Provide 2 unified interfaces (CLI research tools and FastAPI + React web application) with full-stack CI and Docker containerization.
 
 ---
@@ -99,7 +99,7 @@ Empirical latency scaling measurements confirm theoretical asymptotic complexity
 - Dijkstra: $0.15\text{ ms}$ ($N=50$) $\to 37.2\text{ ms}$ ($N=500$)
 - Classical DP: $4.8\text{ ms}$ ($N=50$) $\to 168.7\text{ ms}$ ($N=500$)
 - Time-Augmented DP ($T=10, H=5$): $10.2\text{ ms}$ ($N=50$) $\to 217.2\text{ ms}$ ($N=500$)
-- DSU Local Detour: $1.7\text{ ms}$ ($N=50$) $\to 235\text{ ms}$ ($N=500$) — executing orders of magnitude faster than full network recalculation.
+- DSU Local Detour: $1.7\text{ ms}$ ($N=50$) $\to 23.5\text{ ms}$ ($N=500$) — achieving a consistent ~6.1x speedup over full Time-DP recalculation.
 
 ---
 

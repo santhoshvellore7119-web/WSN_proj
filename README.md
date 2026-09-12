@@ -56,13 +56,14 @@ $$dp[v][h][t] = \max_{u \in \text{nbr}(v)} \min\left(dp[u][h-1][t-\delta], \, E_
 ### 2. Disjoint-Set Union (DSU) Live Detour Recovery
 When an intermediate relay exhausts battery mid-round during active forwarding:
 - Instead of recomputing the full 3D DP table ($O(|E| H T)$), the network performs a local detour search using Union-Find with path compression and rank optimization.
-- **Complexity:** $O(\text{deg}(u) \cdot \alpha(V))$
-- **Speedup:** Achieves a **$6.1\times$ latency reduction** over full table recalculation with zero packet loss across failure rates up to $30\%$.
+- **Complexity:** $O(|E|\alpha(V))$ component connectivity verification + $O(\text{deg}(u)\alpha(V))$ local bridge candidate search.
+- **Speedup:** Achieves a **$6.1\times$ latency reduction** over full 3D DP table recalculation with zero packet loss across failure rates up to $30\%$.
 
 ### 3. Literature Baselines & Empirical Validation
 - **EH-LEACH:** Energy-Harvesting LEACH baseline weighting election probabilities by solar intake ratios.
 - **Predictive Energy-Aware Routing:** Shortest path weighted inversely by projected battery reserve.
-- **Real Solar Trace Replay:** Integrated empirical 24-hour solar irradiance traces calibrated from NREL NSRDB data across clear, cloudy, and overcast profiles.
+- **Solar Trace Replay:** 24-hour diurnal solar irradiance profiles calibrated from published NREL NSRDB seasonal datasets (clear, cloudy, and overcast).
+- **Great Duck Island Case Study:** Topologically parameterized habitat monitoring deployment scenario ($N=32$ motes, canopy occlusion).
 
 ---
 
@@ -126,10 +127,10 @@ python run_heterogeneity_sweep.py
 # Run empirical scalability benchmark (N = 50 -> 500 nodes)
 python run_scalability_benchmark.py
 
-# Run real solar trace replay (NREL data)
+# Run solar trace replay experiment (calibrated from NREL NSRDB profiles)
 python run_real_trace_experiment.py
 
-# Run real-world Great Duck Island deployment case study
+# Run habitat monitoring case study (Great Duck Island topology)
 python run_real_world_case_study.py
 ```
 
