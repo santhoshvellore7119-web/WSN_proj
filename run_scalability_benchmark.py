@@ -59,52 +59,58 @@ def run_scalability_benchmark():
             i: Node(node_id=i, x=rng.uniform(0, current_area), y=rng.uniform(0, current_area), initial_energy=0.045, max_energy=0.50)
             for i in range(n)
         }
-        graph = Graph(nodes)
         alive_nodes = set(nodes.keys())
+
+        # Construct realistic geometric graph within transmission range
+        adj_list: dict = {i: [] for i in range(n)}
+        for i in range(n):
+            for j in range(i + 1, n):
+                dist_ij = nodes[i].distance_to(nodes[j])
+                if dist_ij <= tx_range:
+                    cost_ij = energy_model.transmit_energy(1, dist_ij)
+                    adj_list[i].append((j, cost_ij))
+                    adj_list[j].append((i, cost_ij))
+
+        # Pre-sample query sources to isolate algorithmic execution
+        query_sources = [rng.choice(list(alive_nodes)) for _ in range(10)]
 
         # Measure Dijkstra
         d_times = []
-        for _ in range(5):
-            src = rng.choice(list(alive_nodes))
+        for src in query_sources:
             t0 = time.perf_counter()
-            dijkstra(nodes, graph.adjacency_list, src, current_bs, energy_model, alive_nodes, transmission_range=tx_range)
+            dijkstra(nodes, adj_list, src, current_bs, energy_model, alive_nodes, transmission_range=tx_range)
             d_times.append((time.perf_counter() - t0) * 1e3)  # ms
 
         # Measure Classical DP
         c_times = []
-        for _ in range(5):
-            src = rng.choice(list(alive_nodes))
+        for src in query_sources:
             t0 = time.perf_counter()
-            dp_lifetime_maximin_path(nodes, graph.adjacency_list, src, current_bs, energy_model, alive_nodes, max_hops=fixed_hops, transmission_range=tx_range)
+            dp_lifetime_maximin_path(nodes, adj_list, src, current_bs, energy_model, alive_nodes, max_hops=fixed_hops, transmission_range=tx_range)
             c_times.append((time.perf_counter() - t0) * 1e3)
 
         # Measure Time-Augmented DP
         t_times = []
-        for _ in range(5):
-            src = rng.choice(list(alive_nodes))
+        for src in query_sources:
             t0 = time.perf_counter()
             dp_time_augmented_lifetime(
-                nodes, graph.adjacency_list, src, current_bs, energy_model, alive_nodes,
+                nodes, adj_list, src, current_bs, energy_model, alive_nodes,
                 harvesting_model=harvesting, current_time=12, max_hops=fixed_hops, time_horizon=fixed_t, transmission_range=tx_range
             )
             t_times.append((time.perf_counter() - t0) * 1e3)
 
         # Measure DSU Live Detour Repair
         dsu_times = []
-        # Simulate active route with intermediate node failure
         sample_src = rng.choice(list(alive_nodes))
-        sample_path, _ = dijkstra(nodes, graph.adjacency_list, sample_src, current_bs, energy_model, alive_nodes, transmission_range=tx_range)
+        sample_path, _ = dijkstra(nodes, adj_list, sample_src, current_bs, energy_model, alive_nodes, transmission_range=tx_range)
         if sample_path and len(sample_path) >= 3:
             failed_node = sample_path[1]
-            failed_idx = 1
         else:
             failed_node = sample_src
-            failed_idx = 0
             sample_path = [sample_src, -1]
 
-        for _ in range(10):
+        for _ in range(15):
             t0 = time.perf_counter()
-            rip_up_and_reroute(nodes, graph.adjacency_list, failed_node, sample_path, current_bs, energy_model, alive_nodes, transmission_range=tx_range)
+            rip_up_and_reroute(nodes, adj_list, failed_node, sample_path, current_bs, energy_model, alive_nodes, transmission_range=tx_range)
             dsu_times.append((time.perf_counter() - t0) * 1e3)
 
         mean_d = np.mean(d_times)

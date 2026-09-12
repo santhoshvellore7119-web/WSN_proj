@@ -48,7 +48,7 @@ Our framework directly addresses the primary limitations of the surveyed literat
 
 ### Contribution 2: Fast Fault Recovery via Disjoint-Set Union (DSU)
 - **Local Detour Splicing:** When an intermediate relay exhausts battery mid-round, the network verifies component connectivity in $O(|E| \\cdot \\alpha(V))$ and performs local detour splicing from the predecessor node in $O(\\text{deg}(u) \\cdot \\alpha(V))$ using Union-Find with path compression and rank optimization.
-- **Empirical Speedup:** Achieves a **$6.1\\times$ latency reduction** over global Time-DP recomputation with 0% packet loss across failure rates up to 30%.
+- **Empirical Speedup & Trade-Off:** Achieves a **$3.8\text{--}6.1\times$ latency reduction** over global Time-DP recomputation with 0% packet loss across failure rates up to 30%. DSU trades $\sim 10\times$ raw per-call latency relative to simple Dijkstra ($\sim 0.1\times$) to eliminate the $O(|E|HT)$ recomputation of the multi-hop time-expanded state graph.
 
 ### Contribution 3: Discovery of the Multi-Hop Relay Dissipation Trade-Off ($E_{\\text{rx}}$)
 - **The Reception Energy Penalty:** In dense networks, multi-hop routing incurs electronic reception dissipation ($E_{\\text{rx}} = k \\cdot E_{\\text{elec}}$) across intermediate relays. 
@@ -486,7 +486,8 @@ def generate_literature_pdf(output_pdf_path: str = "report/literature_review_and
     story.append(Paragraph(
         "&bull; <b>Local Detour Splicing:</b> When an intermediate forwarder exhausts its battery mid-round, rather than recomputing the global 3D DP table "
         "(<i>O(|E|HT)</i>) or dropping packets, the network verifies component connectivity in <i>O(|E|&alpha;(V))</i> and performs localized detour splicing from the predecessor node in <i>O(deg(u)&alpha;(V))</i> using Union-Find with path compression and rank optimization.<br/>"
-        "&bull; <b>Empirical Speedup:</b> Achieves an exact <b>6.1&times; latency reduction</b> over full 3D Time-DP recomputation with 0% packet loss across failure rates up to 30%.",
+        "&bull; <b>Empirical Speedup &amp; Trade-Off:</b> Achieves a <b>3.8&ndash;6.1&times; latency reduction</b> over full 3D Time-DP recomputation with 0% packet loss across failure rates up to 30%. "
+        "DSU trades ~10&times; raw per-call latency relative to simple Dijkstra (~0.1&times;) to eliminate the expensive <i>O(|E|HT)</i> recomputation of the multi-hop time-expanded state graph.",
         bullet
     ))
 
