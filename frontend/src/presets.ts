@@ -141,9 +141,9 @@ export const PRESET_SCENARIOS: PresetScenario[] = [
     }
   },
   {
-    id: 'nrel_trace',
-    name: 'Real-Trace Solar Replay (NREL)',
-    description: 'Replays empirical solar irradiance time series with real diurnal curve and cloud attenuation.',
+    id: 'solar_weather_trace',
+    name: 'Diurnal Solar Weather Profile Replay',
+    description: 'Replays diurnal solar irradiance time series across clear sky, intermittent cloud, and overcast profiles.',
     config: {
       nodes: 50,
       rounds: 240,

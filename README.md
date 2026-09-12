@@ -30,7 +30,7 @@ The repository provides a single Python simulation engine (`src/`) with two inte
                              │  • Union-Find Live Detours       │
                              │  • LEACH & EH-LEACH Clustering   │
                              │  • 1st-Order Radio Dissipation   │
-                             │  • Real-Trace Solar Replay (NREL)│
+                             │  • Diurnal Solar Trace Replay    │
                              └──────────────────────────────────┘
 ```
 
@@ -62,7 +62,7 @@ When an intermediate relay exhausts battery mid-round during active forwarding:
 ### 3. Literature Baselines & Empirical Validation
 - **EH-LEACH:** Energy-Harvesting LEACH baseline weighting election probabilities by solar intake ratios.
 - **Predictive Energy-Aware Routing:** Shortest path weighted inversely by projected battery reserve.
-- **Solar Trace Replay:** 24-hour diurnal solar irradiance profiles calibrated from published NREL NSRDB seasonal datasets (clear, cloudy, and overcast).
+- **Solar Weather Profiles:** 24-hour diurnal solar irradiance models across clear sky, intermittent cloudy, and overcast weather regimes.
 - **Great Duck Island Case Study:** Topologically parameterized habitat monitoring deployment scenario ($N=32$ motes, canopy occlusion).
 
 ---
@@ -127,7 +127,7 @@ python run_heterogeneity_sweep.py
 # Run empirical scalability benchmark (N = 50 -> 500 nodes)
 python run_scalability_benchmark.py
 
-# Run solar trace replay experiment (calibrated from NREL NSRDB profiles)
+# Run diurnal solar trace replay experiment (clear sky, cloudy, overcast)
 python run_real_trace_experiment.py
 
 # Run habitat monitoring case study (Great Duck Island topology)
@@ -178,7 +178,7 @@ wsn-energy-routing/
 ├── src/                     # Core simulation modules
 │   ├── network.py           # Graph & Node data structures
 │   ├── energy_model.py      # 1st-order LEACH radio dissipation model
-│   ├── harvesting_model.py  # Solar, Stochastic, Real-Trace (NREL), Shadowed & RF profiles
+│   ├── harvesting_model.py  # Solar, Stochastic, Diurnal Weather, Shadowed & RF profiles
 │   ├── clustering.py        # LEACH and EH-LEACH clustering with min-heap tiebreaker
 │   ├── routing.py           # Dijkstra, A*, Energy-Aware Dijkstra, Union-Find live detours
 │   ├── dp_lifetime.py       # 2D classical and 3D Time-Augmented DP (dp[v][h][t])

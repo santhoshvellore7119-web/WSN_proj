@@ -310,7 +310,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     <option value="shadowed_solar">Heterogeneous Shadowed Solar (Forest/Urban)</option>
                     <option value="stochastic">Stochastic Poisson Arrivals (RF/Thermal)</option>
                     <option value="constant">Constant Background Recharge</option>
-                    <option value="trace">Real Solar Irradiance Trace (NREL GHI)</option>
+                    <option value="trace">Diurnal Solar Weather Profile (Clear/Cloudy/Overcast)</option>
                     <option value="none">None (Battery-Only Depletion Benchmark)</option>
                   </select>
                 </div>

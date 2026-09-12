@@ -20,7 +20,7 @@ When nodes harvest ambient energy (solar irradiance, thermal gradients, or ambie
 - **Algorithmic Contribution:** Formulate and implement **Time-Augmented Maximin Dynamic Programming** ($dp[v][h][t]$) to maximize bottleneck route capacity on a time-expanded acyclic state graph.
 - **Fast Fault Recovery:** Implement **Disjoint-Set Union (Union-Find)** with path compression and union-by-rank for local detour rerouting ($O(|E|\alpha(V)) + O(\text{deg}(u)\alpha(V))$).
 - **Literature Baselines:** Benchmark against published EH-WSN protocols (**EH-LEACH** and predictive energy-weighted shortest path).
-- **Empirical Rigor:** Evaluate under calibrated 24-hour solar irradiance traces (derived from NREL NSRDB seasonal datasets), spatial heterogeneity sweeps ($p_{\text{shadow}} \in [0.0, 1.0]$), and multi-seed statistical significance tests (paired Wilcoxon signed-rank and Student's t-test).
+- **Multi-Scenario Evaluation:** Evaluate under 24-hour diurnal solar weather traces (clear, cloudy, overcast), spatial heterogeneity sweeps ($p_{\text{shadow}} \in [0.0, 1.0]$), and multi-seed statistical significance tests (paired Wilcoxon signed-rank and Student's t-test).
 - **Full-Stack Engineering:** Provide 2 unified interfaces (CLI research tools and FastAPI + React web application) with full-stack CI and Docker containerization.
 
 ---
@@ -34,7 +34,7 @@ wsn-energy-routing/
 ├── src/
 │   ├── network.py           # Node & Graph adjacency list representations
 │   ├── energy_model.py      # LEACH 1st-order radio model (d^2 free-space / d^4 multipath)
-│   ├── harvesting_model.py  # Solar, Stochastic Poisson, RealTrace (NREL), Shadowed & RF profiles
+│   ├── harvesting_model.py  # Solar, Stochastic Poisson, Diurnal Weather, Shadowed & RF profiles
 │   ├── clustering.py        # LEACH and EH-LEACH clustering with min-heap tiebreaking
 │   ├── routing.py           # Dijkstra, A*, Energy-Aware Dijkstra, Union-Find live detour engine
 │   ├── dp_lifetime.py       # 2D Classical Maximin DP and 3D Time-Augmented DP (dp[v][h][t])

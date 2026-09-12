@@ -1,13 +1,13 @@
 """
-Solar Trace Replay Experiment: Weather Profile Benchmark
+Solar Weather Profiles Experiment: Diurnal Benchmark
 
-Evaluates routing protocols using calibrated 24-hour diurnal solar irradiance
-profiles derived from published NREL NSRDB seasonal datasets across 3 weather regimes:
+Evaluates routing protocols using 24-hour diurnal solar irradiance
+curves across 3 distinct weather regimes:
 1. Clear Sky (smooth daytime peak)
 2. Cloudy Intermittent (sudden cloud attenuation dips)
 3. Overcast (attenuated diffuse daylight)
 
-Validates Time-Augmented DP adaptation under realistic diurnal energy variations.
+Validates Time-Augmented DP adaptation under dynamic diurnal energy variations.
 """
 
 import sys
@@ -22,7 +22,7 @@ from simulator import Simulator
 
 def run_real_trace_benchmark():
     print("=" * 78)
-    print("SOLAR TRACE REPLAY: NREL NSRDB-CALIBRATED WEATHER BENCHMARK")
+    print("SOLAR TRACE REPLAY: 24-HOUR DIURNAL WEATHER BENCHMARK")
     print("=" * 78)
 
     num_nodes = 50

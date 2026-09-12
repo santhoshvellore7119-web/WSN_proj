@@ -246,8 +246,8 @@ def create_rf_hotspot_profile(
 
 class RealTraceSolarHarvesting(HarvestingProfile):
     """
-    Representative 24-hour diurnal solar harvesting profile replaying hourly solar irradiance
-    data modeled after published NREL NSRDB solar regimes.
+    24-hour diurnal solar harvesting profile replaying hourly solar irradiance
+    curves across representative weather regimes.
     
     Includes 3 standard weather profiles:
     - 'clear_sky': high smooth solar irradiance with peak at midday

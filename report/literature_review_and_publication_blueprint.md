@@ -47,8 +47,8 @@ Our framework directly addresses the primary limitations of the surveyed literat
 - **The Reception Energy Penalty:** In dense networks, multi-hop routing incurs electronic reception dissipation ($E_{\\text{rx}} = k \\cdot E_{\\text{elec}}$) across intermediate relays. 
 - **Statistical Findings:** Under low/moderate occlusion, direct transmission preserves more aggregate energy. However, under extreme occlusion ($p_{\\text{shadow}} = 1.0$), lookahead Time-DP actively preserves vulnerable relays, extending First Node Death (FND) by **+6 rounds** (+1.2% residual energy gain) with statistical significance ($N=30$ seeds, $p < 10^{-8}$).
 
-### Contribution 4: Calibrated Solar Trace Replay (NREL NSRDB Profiles)
-- Calibrated against 24-hour diurnal solar irradiance data derived from the National Renewable Energy Laboratory (NREL NSRDB), evaluating across clear sky, intermittent cloud, and overcast profiles rather than idealized constant rates.
+### Contribution 4: Multi-Weather Diurnal Solar Trace Replay
+- Evaluates across 24-hour diurnal solar irradiance profiles (clear sky, intermittent cloud, and overcast weather conditions) rather than idealized constant rates.
 
 ---
 
@@ -57,11 +57,11 @@ Our framework directly addresses the primary limitations of the surveyed literat
 | Key Capability | Literature Baselines (EH-LEACH / Dijkstra) | Machine Learning / RL (Deep Q-Networks / ACO) | Proposed Framework (Time-DP + DSU Detours) |
 | :--- | :--- | :--- | :--- |
 | **Recharge Lookahead** | ❌ None (Static Snapshot) | ~ Implicit (Trained Weights) | **✅ Exact 3D DP ($dp[v][h][t]$)** |
-| **Algorithmic Complexity** | $O(\|E\| + \|V\| \\log \|V\|)$ | Heavy iterative training | **Deterministic $O(\|E\| \\cdot H \\cdot T)$** |
+| **Algorithmic Complexity** | $O(\|E\| + \|V\| \log \|V\|)$ | Heavy iterative training | **Deterministic $O(\|E\| \cdot H \cdot T)$** |
 | **Microcontroller Feasibility**| ✅ High (<5 KB RAM) | ❌ Poor (>1 MB weights) | **✅ High (<50 KB RAM table)** |
-| **Mid-Round Fault Recovery** | ❌ Dropped packet / Full recompute | ❌ Retraining | **✅ $O(\|E\|\\alpha(V) + \\text{deg}(u)\\alpha(V))$ DSU detour** |
-| **Physical Radio Dissipation**| ❌ Often omitted | ❌ Idealized functions | **✅ 1st-order radio model ($E_{\\text{fs}} d^2 / E_{\\text{mp}} d^4$)** |
-| **Harvesting Realism** | Synthetic constant rate | Synthetic Poisson | **✅ Calibrated NREL Solar Traces + Shadow Sweeps** |
+| **Mid-Round Fault Recovery** | ❌ Dropped packet / Full recompute | ❌ Retraining | **✅ $O(\|E\|\alpha(V) + \text{deg}(u)\alpha(V))$ DSU detour** |
+| **Physical Radio Dissipation**| ❌ Often omitted | ❌ Idealized functions | **✅ 1st-order radio model ($E_{\text{fs}} d^2 / E_{\text{mp}} d^4$)** |
+| **Harvesting Realism** | Synthetic constant rate | Synthetic Poisson | **✅ Multi-Weather Solar Profiles + Shadow Sweeps** |
 
 ---
 
@@ -79,6 +79,6 @@ Our framework directly addresses the primary limitations of the surveyed literat
 ### Pre-Generated Publication Figures in Repository:
 - **Figure 1:** 5-Node Adversarial Counterexample graph isolating the transit lookahead mechanism (`run_counterexample.py`).
 - **Figure 2:** Multi-seed First Node Death (FND) boxplots across 30 random topologies (`run_multiseed.py`).
-- **Figure 3:** Spatial canopy occlusion sensitivity curves ($p_{\\text{shadow}} \\in [0.1, 1.0]$) (`run_heterogeneity_sweep.py`).
-- **Figure 4:** DSU live detour latency speedup ($6.1\\times$) vs. failure rate ($0\\% \\to 30\\%$) (`run_dsu_benchmark.py`).
-- **Figure 5:** 24-hour real solar trace replay curves (NREL NSRDB clear, cloudy, overcast) (`run_real_trace_experiment.py`).
+- **Figure 3:** Spatial canopy occlusion sensitivity curves ($p_{\text{shadow}} \in [0.1, 1.0]$) (`run_heterogeneity_sweep.py`).
+- **Figure 4:** DSU live detour latency speedup ($6.1\times$) vs. failure rate ($0\% \to 30\%$) (`run_dsu_benchmark.py`).
+- **Figure 5:** 24-hour solar weather profile replay curves (clear sky, cloudy, overcast) (`run_real_trace_experiment.py`).
