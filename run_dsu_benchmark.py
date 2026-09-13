@@ -10,6 +10,7 @@ import sys
 import os
 import time
 import random
+from typing import List, Optional, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -241,7 +242,94 @@ def run_dsu_speedup_benchmark(num_trials: int = 500):
     plt.savefig(filepath, dpi=150)
     plt.close()
     print(f"\nSaved DSU benchmark plot to {filepath}")
+    return speedup_dp, speedup_dijk
+
+
+def run_multiseed_dsu_benchmark(seeds: Optional[List[int]] = None, trials_per_seed: int = 200):
+    """
+    Evaluates DSU speedup over full Time-DP across multiple topologies/seeds
+    to compute empirical speedup range (min, max, mean).
+    """
+    if seeds is None:
+        seeds = [42, 7, 123, 256, 999, 101, 202, 303, 404, 505]
+
+    print("=" * 75)
+    print(f"MULTI-SEED DSU BENCHMARK: SPEEDUP DISTRIBUTION ACROSS {len(seeds)} SEEDS")
+    print("=" * 75)
+
+    dp_speedups = []
+    dijk_speedups = []
+
+    for s in seeds:
+        sim = Simulator(
+            num_nodes=50, area_width=100.0, area_height=100.0, base_station_pos=(50.0, 50.0),
+            initial_energy=0.50, enable_time_dp=True, harvesting_profile='solar',
+            transmission_range=35.0, seed=s
+        )
+        nodes = sim.nodes
+        graph = sim.graph
+        energy_model = sim.energy_model
+        alive_nodes = set(graph.alive_nodes())
+        harvesting = sim.harvesting_model
+
+        candidate_paths = []
+        for src in alive_nodes:
+            _, path, _ = dp_time_augmented_lifetime(
+                nodes=nodes, adj_list=graph.adjacency_list, source=src,
+                base_station_pos=(50.0, 50.0), energy_model=energy_model, alive_nodes=alive_nodes,
+                harvesting_model=harvesting, current_time=10, max_hops=5, transmission_range=35.0
+            )
+            if path and len(path) >= 3 and path[-1] == -1:
+                candidate_paths.append(path)
+
+        if not candidate_paths:
+            for src in alive_nodes:
+                path, _ = dijkstra(nodes, graph.adjacency_list, src, (50.0, 50.0), energy_model, alive_nodes, transmission_range=35.0)
+                if path and len(path) >= 3 and path[-1] == -1:
+                    candidate_paths.append(path)
+
+        if not candidate_paths:
+            continue
+
+        dsu_t, dp_t, dijk_t = [], [], []
+        rng = random.Random(s)
+        for _ in range(trials_per_seed):
+            path = rng.choice(candidate_paths)
+            fail_idx = rng.randint(1, len(path) - 2)
+            failed_node = path[fail_idx]
+            viable_nodes = set(alive_nodes) - {failed_node}
+
+            t0 = time.perf_counter()
+            rip_up_and_reroute(nodes, graph.adjacency_list, failed_node, path, (50.0, 50.0), energy_model, alive_nodes, harvesting_model=harvesting, transmission_range=35.0)
+            dsu_t.append(time.perf_counter() - t0)
+
+            t0 = time.perf_counter()
+            dijkstra(nodes, graph.adjacency_list, path[0], (50.0, 50.0), energy_model, viable_nodes, transmission_range=35.0)
+            dijk_t.append(time.perf_counter() - t0)
+
+            t0 = time.perf_counter()
+            dp_time_augmented_lifetime(nodes, graph.adjacency_list, path[0], (50.0, 50.0), energy_model, viable_nodes, harvesting_model=harvesting, current_time=10, max_hops=5, transmission_range=35.0)
+            dp_t.append(time.perf_counter() - t0)
+
+        m_dsu = np.mean(dsu_t)
+        m_dp = np.mean(dp_t)
+        m_dijk = np.mean(dijk_t)
+        sp_dp = m_dp / max(1e-9, m_dsu)
+        sp_dijk = m_dijk / max(1e-9, m_dsu)
+        dp_speedups.append(sp_dp)
+        dijk_speedups.append(sp_dijk)
+        print(f"  Seed {s:>4} | DSU: {m_dsu*1e6:>6.1f} us | Time-DP: {m_dp*1e6:>6.1f} us | Speedup vs Time-DP: {sp_dp:4.1f}x | Speedup vs Dijkstra: {sp_dijk:4.2f}x")
+
+    print("\n" + "-" * 75)
+    print(f"SPEEDUP SUMMARY ACROSS {len(dp_speedups)} SEEDS:")
+    print("-" * 75)
+    print(f"  Speedup vs Time-DP  : Range = [{np.min(dp_speedups):.1f}x - {np.max(dp_speedups):.1f}x], Mean = {np.mean(dp_speedups):.1f}x")
+    print(f"  Speedup vs Dijkstra : Range = [{np.min(dijk_speedups):.2f}x - {np.max(dijk_speedups):.2f}x], Mean = {np.mean(dijk_speedups):.2f}x (~0.1x)")
+    return dp_speedups, dijk_speedups
 
 
 if __name__ == '__main__':
-    run_dsu_speedup_benchmark()
+    if len(sys.argv) > 1 and sys.argv[1] == '--multi-seed':
+        run_multiseed_dsu_benchmark()
+    else:
+        run_dsu_speedup_benchmark()
