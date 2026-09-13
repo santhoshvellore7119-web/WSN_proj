@@ -45,7 +45,7 @@ Our framework directly addresses the primary limitations of the surveyed literat
 
 ### Contribution 3: Discovery of the Multi-Hop Relay Dissipation Trade-Off ($E_{\text{rx}}$)
 - **The Reception Energy Penalty:** In dense networks, multi-hop routing incurs electronic reception dissipation ($E_{\text{rx}} = k \cdot E_{\text{elec}}$) across intermediate relays. 
-- **Statistical Findings:** Under low/moderate occlusion, direct transmission preserves more aggregate energy. However, under extreme occlusion ($p_{\text{shadow}} = 1.0$), lookahead Time-DP actively preserves vulnerable relays (extending First Node Death by +6 rounds on canonical topology, and up to +19 rounds on individual topologies, $\text{FND} = 98.5 \pm 6.5$ vs $97.9 \pm 7.4$ across $N=30$ seeds).
+- **Statistical Findings:** Under low/moderate occlusion, direct transmission preserves more aggregate energy. Under extreme occlusion ($p_{\text{shadow}} = 1.0$), single-seed evaluation showed a directional gain (+6 rounds FND on canonical topology), but multi-seed testing ($N=30$ seeds) reveals no statistically reliable lifetime benefit across arbitrary topologies ($\text{FND} = 98.5 \pm 6.5$ vs $97.9 \pm 7.4$, $\Delta\text{FND} = +0.60$ rounds, $p = 0.666$, Cohen's $d = 0.086$), with single-seed outcomes spanning a wide range of $\Delta\text{FND} \in [-19, +19]$ rounds ($-19$ in the worst-case topology, $+19$ in the best-case).
 
 ### Contribution 4: Multi-Weather Diurnal Solar Trace Replay
 - Evaluates across 24-hour diurnal solar irradiance profiles (clear sky, intermittent cloud, and overcast weather conditions) rather than idealized constant rates.

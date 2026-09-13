@@ -52,7 +52,7 @@ Our framework directly addresses the primary limitations of the surveyed literat
 
 ### Contribution 3: Discovery of the Multi-Hop Relay Dissipation Trade-Off ($E_{\text{rx}}$)
 - **The Reception Energy Penalty:** In dense networks, multi-hop routing incurs electronic reception dissipation ($E_{\text{rx}} = k \cdot E_{\text{elec}}$) across intermediate relays. 
-- **Statistical Findings:** Under low/moderate occlusion, direct transmission preserves more aggregate energy. However, under extreme occlusion ($p_{\text{shadow}} = 1.0$), lookahead Time-DP actively preserves vulnerable relays (extending First Node Death by +6 rounds on canonical topology, and up to +19 rounds on individual topologies, $\text{FND} = 98.5 \pm 6.5$ vs $97.9 \pm 7.4$ across $N=30$ seeds).
+- **Statistical Findings:** Under low/moderate occlusion, direct transmission preserves more aggregate energy. Under extreme occlusion ($p_{\text{shadow}} = 1.0$), single-seed evaluation showed a directional gain (+6 rounds FND on canonical topology), but multi-seed testing ($N=30$ seeds) reveals no statistically reliable lifetime benefit across arbitrary topologies ($\text{FND} = 98.5 \pm 6.5$ vs $97.9 \pm 7.4$, $\Delta\text{FND} = +0.60$ rounds, $p = 0.666$, Cohen's $d = 0.086$), with single-seed outcomes spanning a wide range of $\Delta\text{FND} \in [-19, +19]$ rounds ($-19$ in the worst-case topology, $+19$ in the best-case).
 
 ### Contribution 4: Multi-Weather Diurnal Solar Trace Replay
 - Evaluates across 24-hour diurnal solar irradiance profiles (clear sky, intermittent cloud, and overcast weather conditions) rather than idealized constant rates.
@@ -495,9 +495,10 @@ def generate_literature_pdf(output_pdf_path: str = "report/literature_review_and
     story.append(Paragraph(
         "&bull; <b>The Reception Energy Penalty:</b> In dense networks, multi-hop routing incurs electronic reception dissipation "
         "(<i>E_rx = k &middot; E_elec</i>) across all intermediate forwarders. We rigorously show via 30-seed statistical testing (p &lt; 10^-8) "
-        "that direct shortest-path routing preserves greater aggregate energy under moderate occlusion, whereas Time-DP lookahead becomes indispensable "
-        "in extreme occlusion (p_shadow = 1.0), extending First Node Death (FND) by <b>+6 rounds</b> on the canonical topology (+1.2% residual energy gain) "
-        "and maintaining FND = 98.5 &plusmn; 6.5 vs 97.9 &plusmn; 7.4 across 30 seeds (with gains up to +19 rounds on individual topologies).",
+        "that direct shortest-path routing preserves greater aggregate energy under moderate occlusion. Under extreme occlusion (p_shadow = 1.0), "
+        "single-seed testing showed a directional gain (+6 rounds FND on seed 42), but multi-seed validation (N=30 seeds) reveals no statistically reliable lifetime benefit "
+        "across arbitrary topologies (FND = 98.5 &plusmn; 6.5 vs 97.9 &plusmn; 7.4, &Delta;FND = +0.60 rounds, p = 0.666, Cohen's d = 0.086), "
+        "with individual seed outcomes spanning a wide range of &Delta;FND &isin; [-19, +19] rounds (-19 in the worst case, +19 in the best).",
         bullet
     ))
 

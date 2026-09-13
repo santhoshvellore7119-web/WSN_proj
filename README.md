@@ -83,7 +83,7 @@ When an intermediate relay exhausts battery mid-round during active forwarding:
 
 ### 2. Operational Value Proposition & Win Regimes
 - **Zero Packet Loss under Mid-Round Relay Failure:** DSU live detour repair maintains **100% packet delivery** under node failure rates up to 30%, whereas static routing drops packets and induces re-exploration timeouts.
-- **Critical Relay Protection under Extreme Occlusion ($p_{\text{shadow}} = 1.0$):** In dense canopy environments where non-harvesting relays are starved of energy, lookahead Time-DP extends First Node Death by **+6 rounds** and preserves +1.2% residual energy.
+- **No Reliable Lifetime Benefit Under Extreme Occlusion Across Seeds ($p_{\text{shadow}} = 1.0$):** While the canonical topology (seed 42) exhibits a +6 round FND improvement (+1.2% residual energy), multi-seed evaluation ($N=30$ seeds) reveals no statistically significant lifetime gain ($\text{FND} = 98.5 \pm 6.5$ vs $97.9 \pm 7.4$, $\Delta\text{FND} = +0.60$ rounds, $p = 0.666$, Cohen's $d = 0.086$). Single-seed outcomes showed high sensitivity to spatial node distribution, ranging between $\Delta\text{FND} \in [-19, +19]$ rounds ($-19$ in the worst-case topology, $+19$ in the best-case).
 - **Documented Physical Relay Dissipation Threshold ($E_{\text{rx}}$):** Multi-hop routing incurs reception dissipation ($E_{\text{rx}} = k \cdot E_{\text{elec}}$) across intermediate relays. Shortest-path Dijkstra preserves more aggregate network energy in open line-of-sight regimes, establishing a clear threshold for when to switch between single-hop Dijkstra and lookahead Time-DP.
 
 ---
