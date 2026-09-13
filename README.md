@@ -210,5 +210,17 @@ wsn-energy-routing/
 
 ---
 
+## ⚠️ Modeling Assumptions & Limitations
+
+To ensure academic rigor and transparent evaluation boundaries, the system's modeling assumptions and limitations are explicitly defined:
+
+1. **First-Order Radio Dissipation ($E_{\text{rx}}$ Overhead):** Radio energy follows the first-order LEACH model ($E_{\text{tx}} = k E_{\text{elec}} + k \epsilon d^n$, $E_{\text{rx}} = k E_{\text{elec}}$). In open line-of-sight environments with low path loss, multi-hop relaying incurs electronic reception penalties across forwarders. Time-Augmented DP lookahead routing is strictly advantageous in regimes with high spatial occlusion ($p_{\text{shadow}} \ge 0.9$) or multi-path distance thresholds ($d > d_0 \approx 87.7\text{m}$).
+2. **Deterministic Path Loss & Channel Model:** Path loss is computed deterministically from 2D Euclidean distances. Dynamic small-scale multipath fading (Rayleigh/Rician) and temporal log-normal shadow fading are omitted.
+3. **Timescale Coupling:** Diurnal solar replenishment operates over hourly intervals, whereas packet forwarding spans milliseconds. The framework couples these via discrete per-round scheduling epochs $\delta$.
+4. **Idealized MAC Scheduling:** Assumes collision-free TDMA cluster schedules and orthogonal inter-cluster channels without packet queue overflow or buffer backpressure.
+5. **Static Network Topology:** Sensor nodes and base stations are statically deployed without mobile nodes.
+
+---
+
 ## 📄 License
 This project is licensed under the [MIT License](LICENSE).
