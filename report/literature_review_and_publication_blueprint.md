@@ -40,12 +40,12 @@ Our framework directly addresses the primary limitations of the surveyed literat
 - **Provable Guarantees:** Operates in strictly polynomial time $O(\|E\| \\cdot H \\cdot T)$ and space $O(\|V\| \\cdot H \\cdot T)$ (<50 kB memory), achieving a provable **$2\\epsilon$-approximation bound** under bounded stochastic arrival variance $\|\\xi\| \\le \\epsilon$.
 
 ### Contribution 2: Fast Fault Recovery via Disjoint-Set Union (DSU)
-- **Local Detour Splicing:** When an intermediate relay exhausts battery mid-round, the network verifies component connectivity in $O(|E| \\cdot \\alpha(V))$ and performs local detour splicing from the predecessor node in $O(\\text{deg}(u) \\cdot \\alpha(V))$ using Union-Find with path compression and rank optimization.
-- **Empirical Speedup & Trade-Off:** Achieves a **$3.8\text{--}6.1\times$ latency reduction** over global Time-DP recomputation with 0% packet loss across failure rates up to 30%. DSU trades $\sim 10\times$ raw per-call latency relative to simple Dijkstra ($\sim 0.1\times$) to eliminate the $O(|E|HT)$ recomputation of the multi-hop time-expanded state graph.
+- **Local Detour Splicing:** When an intermediate relay exhausts battery mid-round, the network verifies component connectivity in $O(|E| \cdot \alpha(V))$ and performs local detour splicing from the predecessor node in $O(\text{deg}(u) \cdot \alpha(V))$ using Union-Find with path compression and rank optimization.
+- **Empirical Speedup & Trade-Off:** Achieves a **$3.3\text{--}6.1\times$ latency reduction** over global Time-DP recomputation with 0% packet loss across failure rates up to 30%. DSU trades $\sim 10\times$ raw per-call latency relative to simple Dijkstra ($\sim 0.12\times$) to eliminate the $O(|E|HT)$ recomputation of the multi-hop time-expanded state graph.
 
-### Contribution 3: Discovery of the Multi-Hop Relay Dissipation Trade-Off ($E_{\\text{rx}}$)
-- **The Reception Energy Penalty:** In dense networks, multi-hop routing incurs electronic reception dissipation ($E_{\\text{rx}} = k \\cdot E_{\\text{elec}}$) across intermediate relays. 
-- **Statistical Findings:** Under low/moderate occlusion, direct transmission preserves more aggregate energy. However, under extreme occlusion ($p_{\\text{shadow}} = 1.0$), lookahead Time-DP actively preserves vulnerable relays, extending First Node Death (FND) by **+6 rounds** (+1.2% residual energy gain) with statistical significance ($N=30$ seeds, $p < 10^{-8}$).
+### Contribution 3: Discovery of the Multi-Hop Relay Dissipation Trade-Off ($E_{\text{rx}}$)
+- **The Reception Energy Penalty:** In dense networks, multi-hop routing incurs electronic reception dissipation ($E_{\text{rx}} = k \cdot E_{\text{elec}}$) across intermediate relays. 
+- **Statistical Findings:** Under low/moderate occlusion, direct transmission preserves more aggregate energy. However, under extreme occlusion ($p_{\text{shadow}} = 1.0$), lookahead Time-DP actively preserves vulnerable relays (extending First Node Death by +6 rounds on canonical topology, and up to +19 rounds on individual topologies, $\text{FND} = 98.5 \pm 6.5$ vs $97.9 \pm 7.4$ across $N=30$ seeds).
 
 ### Contribution 4: Multi-Weather Diurnal Solar Trace Replay
 - Evaluates across 24-hour diurnal solar irradiance profiles (clear sky, intermittent cloud, and overcast weather conditions) rather than idealized constant rates.
