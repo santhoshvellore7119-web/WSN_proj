@@ -32,6 +32,15 @@ The project consists of a complete full-stack web application integrating an asy
 
 ---
 
+> [!CAUTION]
+> **CRITICAL WORKING DIRECTORY REQUIREMENT:**
+> - **Project Root:** `C:\Users\Santhosh\wsn-energy-routing`
+> - **Frontend Directory:** `C:\Users\Santhosh\wsn-energy-routing\frontend`
+> - **DO NOT** execute commands inside `C:\Users\Santhosh\frontend` (which is an unrelated, separate project).
+> - Executing commands in the wrong directory will trigger `npm error Missing script: "dev"` or `Could not open requirements file: 'requirements.txt'`.
+
+---
+
 ## 2. Prerequisites & One-Time Initial Setup
 
 Ensure the following tools are installed on your machine:
@@ -39,56 +48,66 @@ Ensure the following tools are installed on your machine:
 - **Node.js 18+** (with `npm`)
 - **Git**
 
-### Step 1: Clone the Repository
-```bash
-git clone https://github.com/santhoshvellore7119-web/WSN_proj.git
-cd WSN_proj
+### Step 1: Open or Clone the Repository
+```cmd
+cd C:\Users\Santhosh\wsn-energy-routing
 ```
+*(If cloning on a new machine: `git clone https://github.com/santhoshvellore7119-web/WSN_proj.git wsn-energy-routing && cd wsn-energy-routing`)*
 
 ### Step 2: Setup Python Virtual Environment & Install Backend Dependencies
 - **Windows (CMD / PowerShell):**
   ```cmd
+  cd C:\Users\Santhosh\wsn-energy-routing
   python -m venv .venv
   .venv\Scripts\activate
-  pip install --upgrade pip
+  python -m pip install --upgrade pip
   pip install -r requirements.txt
   ```
+  *(Note: Always use `python -m pip install` to avoid Windows file-locking update errors).*
+
 - **Linux / macOS:**
   ```bash
   python3 -m venv .venv
   source .venv/bin/activate
-  pip install --upgrade pip
+  python3 -m pip install --upgrade pip
   pip install -r requirements.txt
   ```
 
 ### Step 3: Install Frontend Node Dependencies
-```bash
-cd frontend
+```cmd
+cd C:\Users\Santhosh\wsn-energy-routing\frontend
 npm install
 cd ..
 ```
 
 ---
 
-## 3. How to Run the Full-Stack Application in Command Prompt / Terminal
+## 3. How to Run the Full-Stack Application
 
-To run both the backend API and frontend UI concurrently, open **two separate terminal windows** from the project root:
-
-### Terminal 1: Start the FastAPI Backend (Port 8000)
+### Method A: Automated 1-Click Startup (Recommended)
+A pre-configured startup batch script is included in the project root to automatically manage ports, activate environments, and launch both servers:
 ```cmd
-:: Activate virtual environment
-.venv\Scripts\activate
-
-:: Launch FastAPI with auto-reload
-python -m uvicorn backend.main:app --reload --port 8000
+cd C:\Users\Santhosh\wsn-energy-routing
+.\start_offline.bat
 ```
-- **Backend API URL:** `http://localhost:8000`
-- **Interactive Swagger Docs:** `http://localhost:8000/docs`
-- **Redoc Documentation:** `http://localhost:8000/redoc`
+*(Or simply double-click `start_offline.bat` in Windows File Explorer. It cleans busy ports 8000/3000, starts FastAPI, starts React, and opens http://localhost:3000 in your browser).*
 
-### Terminal 2: Start the React Frontend (Port 3000)
+### Method B: Manual Startup in Two Terminals
+To run both the backend API and frontend UI manually, open **two separate terminal windows**:
+
+#### Terminal 1: Start the FastAPI Backend (Port 8000)
 ```cmd
-cd frontend
+cd C:\Users\Santhosh\wsn-energy-routing
+.venv\Scripts\activate
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+```
+- **Backend API URL:** `http://127.0.0.1:8000`
+- **Interactive Swagger Docs:** `http://127.0.0.1:8000/docs`
+- **Redoc Documentation:** `http://127.0.0.1:8000/redoc`
+
+#### Terminal 2: Start the React Frontend (Port 3000)
+```cmd
+cd C:\Users\Santhosh\wsn-energy-routing\frontend
 npm run dev
 ```
 - **Frontend Dashboard URL:** `http://localhost:3000`
@@ -99,7 +118,9 @@ npm run dev
 ## 4. Step-by-Step Procedure to Run in Visual Studio Code (VS Code)
 
 ### Step 1: Open Project in VS Code
+Launch VS Code at the project root:
 ```bash
+cd C:\Users\Santhosh\wsn-energy-routing
 code .
 ```
 
@@ -112,12 +133,14 @@ code .
 1. Open the integrated terminal with ``Ctrl + ` ``.
 2. Click the **Split Terminal** button on the top right of the terminal panel (or press `Ctrl + \`).
 3. In the **Left Pane (Backend)**, run:
-   ```bash
-   cd backend && python -m uvicorn main:app --reload --port 8000
+   ```cmd
+   .\.venv\Scripts\activate
+   python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
    ```
 4. In the **Right Pane (Frontend)**, run:
-   ```bash
-   cd frontend && npm run dev
+   ```cmd
+   cd frontend
+   npm run dev
    ```
 
 ### Step 4: Optional 1-Click Debugging via `.vscode/launch.json`
@@ -172,31 +195,40 @@ docker compose down
 
 ---
 
-## 7. Troubleshooting & Common Fixes
+## 7. Troubleshooting & Common Issues
 
-| Symptom / Error | Cause | Fix |
+| Symptom / Error | Underlying Cause | Resolution |
 | :--- | :--- | :--- |
-| **PowerShell script execution disabled** | Windows policy blocks `activate.ps1`. | Run in PowerShell: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` |
-| **Port 8000 or 3000 already in use** | Previous server process is still running. | Windows: `netstat -ano \| findstr :8000` then `taskkill /PID <PID> /F` |
-| **502 Bad Gateway / Backend unavailable** | Frontend proxy cannot connect to port 8000. | Ensure FastAPI backend is running in Terminal 1 before opening the frontend in Terminal 2. |
+| **`npm error Missing script: "dev"`** | Command was run in `C:\Users\Santhosh\frontend` (unrelated Create-React-App project) instead of the actual project frontend folder. | Navigate to `cd C:\Users\Santhosh\wsn-energy-routing\frontend` and verify `package.json` contains `"dev": "tsx server.ts"`. |
+| **`ERROR: Could not open requirements file: 'requirements.txt'`** | Terminal is inside `frontend\` or outside the project root. `requirements.txt` is in the root directory. | Run `cd C:\Users\Santhosh\wsn-energy-routing` before executing `pip install -r requirements.txt`. |
+| **`ERROR: To modify pip, please run python.exe -m pip...`** | Windows binary-locking prevents `pip.exe` from modifying its own file in-place during upgrade. | Always run the module invocation: `python -m pip install --upgrade pip`. |
+| **`PowerShell execution policy blocks activate.ps1`** | Default Windows PowerShell policy blocks local script execution. | Run once in PowerShell: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`. |
+| **`Port 8000 or 3000 already in use`** | Previous server processes were left running in the background. | Run `start_offline.bat` (auto-cleans ports) or run: `netstat -ano \| findstr :8000` and `taskkill /PID <PID> /F`. |
+| **`502 Bad Gateway / Network Error in Browser`** | Frontend proxy cannot connect to backend because FastAPI is offline. | Ensure FastAPI backend is running on port 8000 before accessing the frontend on port 3000. |
 
 ---
 
 ## 8. Quick Full-Stack Execution Cheat-Sheet
 
-```bash
-# 1. Clone & Setup
-git clone https://github.com/santhoshvellore7119-web/WSN_proj.git && cd WSN_proj
-python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt
-cd frontend && npm install && cd ..
+```cmd
+# -------------------------------------------------------------
+# OPTION A: ONE-CLICK LAUNCH (FASTEST)
+# -------------------------------------------------------------
+cd C:\Users\Santhosh\wsn-energy-routing
+.\start_offline.bat
 
-# 2. Start Backend (Terminal 1)
-python -m uvicorn backend.main:app --reload --port 8000
+# -------------------------------------------------------------
+# OPTION B: MANUAL TWO-TERMINAL SETUP
+# -------------------------------------------------------------
+# Terminal 1 (FastAPI Backend - Port 8000):
+cd C:\Users\Santhosh\wsn-energy-routing
+.venv\Scripts\activate
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
-# 3. Start Frontend (Terminal 2)
-cd frontend && npm run dev
+# Terminal 2 (React Frontend - Port 3000):
+cd C:\Users\Santhosh\wsn-energy-routing\frontend
+npm run dev
 
-# 4. Open in Browser
-# Frontend App: http://localhost:3000
-# Backend Swagger API: http://localhost:8000/docs
+# Access in Browser:
+# Dashboard: http://localhost:3000  |  API Docs: http://127.0.0.1:8000/docs
 ```
