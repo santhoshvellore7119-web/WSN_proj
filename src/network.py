@@ -15,13 +15,17 @@ class Node:
         x: float,
         y: float,
         initial_energy: float = 2.0,
-        max_energy: Optional[float] = None
+        max_energy: Optional[float] = None,
+        battery_leakage_rate: float = 0.0,
+        charging_efficiency: float = 1.0
     ):
         self.node_id = node_id
         self.x = x
         self.y = y
         self.initial_energy = initial_energy
         self.max_energy = max_energy if max_energy is not None else max(initial_energy, 2.0)
+        self.battery_leakage_rate = battery_leakage_rate
+        self.charging_efficiency = charging_efficiency
         self.residual_energy = min(initial_energy, self.max_energy)
         self.role = 'member'  # 'CH' or 'member'
         self.cluster_id = -1
@@ -42,12 +46,25 @@ class Node:
             self.is_alive = False
             self.residual_energy = 0.0
 
-    def harvest_energy(self, amount: float) -> float:
-        """Adds harvested energy up to maximum battery capacity."""
-        if amount <= 0.0:
+    def apply_leakage(self, leakage_rate: Optional[float] = None) -> float:
+        """Applies internal self-discharge leakage (1 - lambda) * E."""
+        rate = leakage_rate if leakage_rate is not None else self.battery_leakage_rate
+        if rate > 0.0 and self.residual_energy > 0.0:
+            lost = self.residual_energy * min(1.0, max(0.0, rate))
+            self.residual_energy = max(0.0, self.residual_energy - lost)
+            if self.residual_energy <= 0.0:
+                self.is_alive = False
+            return lost
+        return 0.0
+
+    def harvest_energy(self, amount: float, efficiency: Optional[float] = None) -> float:
+        """Adds harvested energy multiplied by charging efficiency up to maximum battery capacity."""
+        eff = efficiency if efficiency is not None else self.charging_efficiency
+        effective_amount = amount * max(0.0, min(1.0, eff))
+        if effective_amount <= 0.0:
             return 0.0
         room = max(0.0, self.max_energy - self.residual_energy)
-        actual_harvested = min(amount, room)
+        actual_harvested = min(effective_amount, room)
         self.residual_energy += actual_harvested
         self.total_harvested_energy += actual_harvested
         if self.residual_energy > 0.0:

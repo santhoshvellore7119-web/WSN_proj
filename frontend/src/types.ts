@@ -1,6 +1,6 @@
 export type HarvestingProfileType = 'none' | 'constant' | 'solar' | 'shadowed_solar' | 'stochastic' | 'trace';
 
-export type RoutingAlgorithmType = 'dijkstra' | 'energy_dijkstra' | 'astar' | 'dp_maximin' | 'dp_time_augmented';
+export type RoutingAlgorithmType = 'dijkstra' | 'energy_dijkstra' | 'astar' | 'dp_maximin' | 'dp_time_augmented' | 'belief_dp';
 
 export type TopologyDistribution = 'uniform' | 'poisson_cluster' | 'grid';
 
@@ -24,9 +24,19 @@ export interface SimulationConfig {
   disable_time_dp: boolean;
   disable_harvesting_ch: boolean;
   disable_live_reroute: boolean;
+  enable_belief_dp?: boolean;
+  belief_deadline_w?: number;
+  belief_reservations?: boolean;
+  belief_lcb_z?: number;
+  leakage_rate?: number;
+  charging_efficiency?: number;
+  weather_noise?: number;
+  solar_noise?: number;
   max_dp_hops: number;
   routing_algorithm: RoutingAlgorithmType;
   transmission_range?: number; // Max transmission range or null for unconstrained
+  energy_view?: 'oracle' | 'stale' | 'blind' | 'belief' | 'histogram';
+  report_interval?: number;
   topology_distribution?: TopologyDistribution;
   seed: number;
   k_bits?: number;
@@ -79,23 +89,43 @@ export interface SimulationSummary {
   total_reroutes: number;
   network_lifetime_efficiency: number; // % alive at max rounds
   average_pdr: number; // Average Packet Delivery Ratio
+  average_latency?: number;
+  total_energy_wasted?: number;
+  total_packets_generated?: number;
+  total_packets_delivered?: number;
   jains_fairness_final: number;
+  brier_score?: number;
+  ece?: number;
   execution_time_ms: number;
 }
 
 export interface TimeSeriesData {
   rounds: number[];
   alive_nodes: number[];
+  brownout_nodes?: number[];
   total_energy: number[];
   harvested_energy: number[];
   consumed_energy: number[];
+  energy_wasted?: number[];
   reroute_events: number[];
   fairness_index: number[];
   pdr_history: number[];
+  latency_history?: number[];
+  packets_generated?: number[];
+  packets_delivered?: number[];
 }
 
 export interface DetailedData {
   energy_matrix: number[][]; // [round][nodeIndex]
+  belief_matrix?: number[][]; // [round][nodeIndex]
+  variance_matrix?: number[][]; // [round][nodeIndex]
+  calibration?: {
+    brier_score: number;
+    ece: number;
+    sample_count: number;
+    mean_confidence?: number;
+    mean_accuracy?: number;
+  };
   cluster_heads_history: number[][]; // [round] -> list of CH node IDs
   cluster_assignments_history?: Record<number, number>[]; // [round] -> { nodeId: chId }
   routes_history: Record<number, [number[] | null, number]>[]; // [round] -> { chId: [path, cost] }

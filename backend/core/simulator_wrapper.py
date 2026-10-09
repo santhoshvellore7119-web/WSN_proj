@@ -43,21 +43,29 @@ class SimulatorWrapper:
             config.get('bs_x', 50.0),
             config.get('bs_y', 50.0)
         )
-        initial_energy = config.get('init_energy', 1.0)
-        max_battery_capacity = config.get('max_capacity', 2.0)
-        desired_clusters_ratio = config.get('cluster_ratio', 0.06)
+        initial_energy = config.get('init_energy', 0.05)
+        max_battery_capacity = config.get('max_capacity', 0.50)
+        desired_clusters_ratio = config.get('cluster_ratio', 0.08)
+        transmission_range = config.get('transmission_range', 35.0)
         seed = config.get('seed', 42)
+        energy_view = config.get('energy_view', 'oracle')
+        report_interval = config.get('report_interval', 1)
 
         # Harvesting configuration
         harvesting_profile = config.get('harvesting_profile')
+        weather_noise = config.get('weather_noise', 0.0)
+        solar_noise = config.get('solar_noise', 0.0)
+
         if harvesting_profile == "none":
             harvesting_profile = None
             harvesting_kwargs = {}
         elif harvesting_profile == "solar":
             harvesting_kwargs = {
-                'peak_rate': config.get('solar_peak', 0.03),
+                'peak_rate': config.get('solar_peak', 0.003),
                 'period': 24,
                 'day_fraction': 0.5,
+                'solar_noise': solar_noise,
+                'weather_noise': weather_noise,
                 'seed': seed
             }
         elif harvesting_profile == "stochastic":
@@ -74,7 +82,13 @@ class SimulatorWrapper:
 
         # Feature toggles and algorithm mapping
         routing_algorithm = config.get('routing_algorithm', 'dijkstra')
-        if routing_algorithm in ('dijkstra', 'energy_dijkstra', 'astar'):
+        enable_belief_dp = config.get('enable_belief_dp', False)
+
+        if routing_algorithm == 'belief_dp':
+            enable_belief_dp = True
+            enable_time_dp = False
+            enable_dp_routing = False
+        elif routing_algorithm in ('dijkstra', 'energy_dijkstra', 'astar'):
             enable_time_dp = False
             enable_dp_routing = False
         elif routing_algorithm == 'dp_maximin':
@@ -100,16 +114,32 @@ class SimulatorWrapper:
             initial_energy=initial_energy,
             max_battery_capacity=max_battery_capacity,
             desired_clusters_ratio=desired_clusters_ratio,
+            transmission_range=transmission_range,
             enable_dp_routing=enable_dp_routing,
             enable_time_dp=enable_time_dp,
+            enable_belief_dp=enable_belief_dp,
+            belief_deadline_w=config.get('belief_deadline_w', 2),
+            belief_reservations=config.get('belief_reservations', True),
+            belief_lcb_z=config.get('belief_lcb_z', None),
             enable_harvesting_ch=enable_harvesting_ch,
             enable_live_reroute=enable_live_reroute,
             harvesting_profile=harvesting_profile,
             harvesting_kwargs=harvesting_kwargs,
             max_dp_hops=max_dp_hops,
             routing_algorithm=routing_algorithm,
+            energy_view_type=energy_view,
+            report_interval=report_interval,
             seed=seed
         )
+
+        # Apply battery leakage and charging efficiency if specified
+        leakage_rate = config.get('leakage_rate', 0.0)
+        charging_efficiency = config.get('charging_efficiency', 1.0)
+        for node in sim.nodes.values():
+            if leakage_rate > 0.0:
+                node.battery_leakage_rate = leakage_rate
+            if charging_efficiency < 1.0:
+                node.charging_efficiency = charging_efficiency
 
         # Run simulation
         import time
@@ -117,6 +147,8 @@ class SimulatorWrapper:
         max_rounds = config.get('rounds', 200)
         sim.run(max_rounds=max_rounds, verbose=False)
         t_duration_ms = (time.perf_counter() - t_start) * 1000.0
+
+        calib_metrics = sim.get_calibration_metrics() if hasattr(sim, 'get_calibration_metrics') else {}
 
         # Prepare results
         results = {
@@ -134,7 +166,13 @@ class SimulatorWrapper:
                 'total_reroutes': sum(sim.reroute_events_history),
                 'network_lifetime_efficiency': (sim.alive_nodes_history[-1] / sim.num_nodes * 100.0) if sim.alive_nodes_history and sim.num_nodes > 0 else 0.0,
                 'average_pdr': (sum(sim.pdr_history) / len(sim.pdr_history)) if getattr(sim, 'pdr_history', None) else 1.0,
+                'average_latency': (sum(sim.latency_history) / len(sim.latency_history)) if getattr(sim, 'latency_history', None) else 0.0,
+                'total_energy_wasted': sum(getattr(sim, 'energy_wasted_history', [0.0])),
+                'total_packets_generated': sum(getattr(sim, 'packets_generated_history', [0])),
+                'total_packets_delivered': sum(getattr(sim, 'packets_delivered_history', [0])),
                 'jains_fairness_final': sim.fairness_history[-1] if getattr(sim, 'fairness_history', None) else 1.0,
+                'brier_score': round(calib_metrics.get('brier_score', 0.0), 4),
+                'ece': round(calib_metrics.get('ece', 0.0), 4),
                 'execution_time_ms': round(t_duration_ms, 2)
             },
 
@@ -142,17 +180,25 @@ class SimulatorWrapper:
             'time_series': {
                 'rounds': list(range(1, len(sim.alive_nodes_history) + 1)),
                 'alive_nodes': sim.alive_nodes_history,
+                'brownout_nodes': getattr(sim, 'brownout_history', [0] * len(sim.alive_nodes_history)),
                 'total_energy': sim.total_energy_history,
                 'harvested_energy': sim.harvested_energy_history,
                 'consumed_energy': getattr(sim, 'consumed_energy_history', [0.0] * len(sim.alive_nodes_history)),
+                'energy_wasted': getattr(sim, 'energy_wasted_history', [0.0] * len(sim.alive_nodes_history)),
                 'reroute_events': sim.reroute_events_history,
                 'fairness_index': getattr(sim, 'fairness_history', [1.0] * len(sim.alive_nodes_history)),
-                'pdr_history': getattr(sim, 'pdr_history', [1.0] * len(sim.alive_nodes_history))
+                'pdr_history': getattr(sim, 'pdr_history', [1.0] * len(sim.alive_nodes_history)),
+                'latency_history': getattr(sim, 'latency_history', [0.0] * len(sim.alive_nodes_history)),
+                'packets_generated': getattr(sim, 'packets_generated_history', [0] * len(sim.alive_nodes_history)),
+                'packets_delivered': getattr(sim, 'packets_delivered_history', [0] * len(sim.alive_nodes_history))
             },
 
             # Detailed data for visualization
             'detailed_data': {
                 'energy_matrix': sim.energy_matrix,  # [round, node]
+                'belief_matrix': getattr(sim, 'belief_mean_history', []),
+                'variance_matrix': getattr(sim, 'belief_variance_history', []),
+                'calibration': calib_metrics,
                 'cluster_heads_history': sim.cluster_heads_history,
                 'cluster_assignments_history': getattr(sim, 'cluster_assignments_history', []),
                 'routes_history': sim.routes_history,

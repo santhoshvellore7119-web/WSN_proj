@@ -14,6 +14,7 @@ import time
 from typing import Dict, List, Tuple, Optional, Set, Callable, Iterable, Any
 from network import Node, Graph
 from energy_model import EnergyModel
+from energy_view import EnergyView, OracleView
 
 
 class UnionFind:
@@ -150,7 +151,8 @@ def energy_aware_dijkstra(
     alive_nodes: Set[int],
     k: int = 1,
     alpha: float = 1.0,
-    transmission_range: Optional[float] = None
+    transmission_range: Optional[float] = None,
+    energy_view: Optional[EnergyView] = None
 ) -> Tuple[Optional[List[int]], float]:
     """
     Energy-Aware Dijkstra (Minimum Battery Cost Routing / MBCR style).
@@ -163,6 +165,9 @@ def energy_aware_dijkstra(
     """
     if start not in alive_nodes:
         return None, float('inf')
+
+    if energy_view is None:
+        energy_view = OracleView(nodes)
 
     dist: Dict[int, float] = {node_id: float('inf') for node_id in nodes}
     dist[start] = 0.0
@@ -195,7 +200,7 @@ def energy_aware_dijkstra(
                     v_node = nodes[v]
                     # Penalty factor inversely proportional to residual energy
                     init_e = getattr(v_node, 'initial_energy', 1.0)
-                    res_e = max(1e-9, v_node.residual_energy)
+                    res_e = max(1e-9, energy_view.mean(v))
                     penalty = (1.0 + (init_e / res_e)) ** alpha
                     weight = tx_energy * penalty
                     neighbors.append((v, weight))
@@ -341,7 +346,8 @@ def rip_up_and_reroute(
     harvesting_model: Optional[Any] = None,
     current_time: int = 0,
     transmission_range: Optional[float] = None,
-    k: int = 1
+    k: int = 1,
+    energy_view: Optional[EnergyView] = None
 ) -> Tuple[Optional[List[int]], float]:
     """
     Reroutes an active path around a failed intermediate node using Union-Find (DSU).
@@ -354,6 +360,9 @@ def rip_up_and_reroute(
     """
     if not active_path or failed_node_id not in active_path:
         return active_path, 0.0
+
+    if energy_view is None:
+        energy_view = OracleView(nodes)
 
     fail_idx = active_path.index(failed_node_id)
     if fail_idx == 0:
@@ -443,8 +452,8 @@ def rip_up_and_reroute(
     if not candidates:
         return None, float('inf')
 
-    # Sort by lowest energy cost, tie-break by residual energy
-    candidates.sort(key=lambda item: (item[0], -nodes[item[1]].residual_energy if item[1] != -1 else 0.0))
+    # Sort by lowest energy cost, tie-break by residual energy from energy view
+    candidates.sort(key=lambda item: (item[0], -energy_view.mean(item[1]) if item[1] != -1 else 0.0))
     best_cost, best_target, best_subpath = candidates[0]
 
     # Splice detour into active path
@@ -473,7 +482,8 @@ def compute_routes_for_cluster_heads(
     base_station_pos: Tuple[float, float],
     alive_nodes: Set[int],
     algorithm: str = 'dijkstra',
-    transmission_range: Optional[float] = None
+    transmission_range: Optional[float] = None,
+    energy_view: Optional[EnergyView] = None
 ) -> Dict[int, Tuple[Optional[List[int]], float]]:
     """Computes routing paths from each cluster head to the base station."""
     routes = {}
@@ -496,7 +506,8 @@ def compute_routes_for_cluster_heads(
         elif algorithm in ('energy_dijkstra', 'energy_aware_dijkstra', 'energy_aware'):
             path, cost = energy_aware_dijkstra(
                 nodes, graph.adjacency_list, ch, base_station_pos, energy_model,
-                alive_nodes, transmission_range=transmission_range
+                alive_nodes, transmission_range=transmission_range,
+                energy_view=energy_view
             )
             routes[ch] = (path, cost)
         else:

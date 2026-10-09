@@ -24,9 +24,10 @@ def parse_args():
     parser.add_argument("--area", type=float, default=100.0, help="Field dimension (width & height in meters)")
     parser.add_argument("--bs-x", type=float, default=50.0, help="Base Station X position")
     parser.add_argument("--bs-y", type=float, default=50.0, help="Base Station Y position")
-    parser.add_argument("--init-energy", type=float, default=1.0, help="Initial energy per node (Joules)")
-    parser.add_argument("--max-capacity", type=float, default=2.0, help="Max battery capacity (Joules)")
-    parser.add_argument("--cluster-ratio", type=float, default=0.06, help="Target cluster ratio (LEACH p)")
+    parser.add_argument("--init-energy", type=float, default=0.05, help="Initial energy per node (Joules)")
+    parser.add_argument("--max-capacity", type=float, default=0.50, help="Max battery capacity (Joules)")
+    parser.add_argument("--cluster-ratio", type=float, default=0.08, help="Target cluster ratio (LEACH p)")
+    parser.add_argument("--tx-range", type=float, default=35.0, help="Transmission range in meters")
 
     # Harvesting configuration
     parser.add_argument(
@@ -36,21 +37,23 @@ def parse_args():
         choices=["none", "constant", "solar", "stochastic", "shadowed", "hotspot"],
         help="Energy harvesting profile"
     )
-    parser.add_argument("--solar-peak", type=float, default=0.03, help="Solar peak recharge rate (J/round)")
+    parser.add_argument("--solar-peak", type=float, default=0.003, help="Solar peak recharge rate (J/round)")
     parser.add_argument("--stoch-lambda", type=float, default=2.0, help="Poisson lambda parameter")
     parser.add_argument("--stoch-quantum", type=float, default=0.005, help="Energy per Poisson arrival (Joules)")
 
-    # Feature toggles
+    # Feature toggles & Energy Views
     parser.add_argument("--disable-time-dp", action="store_true", help="Use standard shortest-path routing instead of Time-DP")
     parser.add_argument("--disable-harvesting-ch", action="store_true", help="Disable harvest-weighted cluster head rotation")
     parser.add_argument("--disable-live-reroute", action="store_true", help="Disable DSU live rerouting")
     parser.add_argument("--max-dp-hops", type=int, default=5, help="Max hop horizon for DP")
     parser.add_argument("--routing-algorithm", type=str, default="dijkstra", choices=["dijkstra", "astar", "energy_dijkstra"])
+    parser.add_argument("--energy-view", type=str, default="oracle", choices=["oracle", "stale", "blind", "belief"], help="Router energy view")
+    parser.add_argument("--report-interval", type=int, default=1, help="Telemetry report interval in rounds")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for node positions")
 
     # Outputs
     parser.add_argument("--visualize", action="store_true", default=True, help="Generate plots after simulation")
-    parser.add_argument("--benchmark", action="store_true", help="Run comparative 5-scenario benchmark")
+    parser.add_argument("--benchmark", action="store_true", help="Run comparative benchmark")
 
     return parser.parse_args()
 
@@ -88,6 +91,7 @@ def main():
         initial_energy=args.init_energy,
         max_battery_capacity=args.max_capacity,
         desired_clusters_ratio=args.cluster_ratio,
+        transmission_range=args.tx_range,
         enable_time_dp=not args.disable_time_dp,
         enable_harvesting_ch=not args.disable_harvesting_ch,
         enable_live_reroute=not args.disable_live_reroute,
@@ -95,6 +99,8 @@ def main():
         harvesting_kwargs=harv_kwargs,
         max_dp_hops=args.max_dp_hops,
         routing_algorithm=args.routing_algorithm,
+        energy_view_type=args.energy_view,
+        report_interval=args.report_interval,
         seed=args.seed
     )
 

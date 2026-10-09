@@ -11,6 +11,7 @@ import random
 from typing import Dict, List, Tuple, Optional
 from network import Node, Graph
 from energy_model import EnergyModel
+from energy_view import EnergyView, OracleView
 try:
     from harvesting_model import HarvestingProfile
 except ImportError:
@@ -25,7 +26,8 @@ def leach_clustering(
     harvesting_model: Optional[HarvestingProfile] = None,
     current_time: int = 0,
     lookahead_rounds: int = 1,
-    rng: Optional[random.Random] = None
+    rng: Optional[random.Random] = None,
+    energy_view: Optional[EnergyView] = None
 ) -> Tuple[Dict[int, int], List[int]]:
     """
     Elects cluster heads for the current round and assigns member nodes
@@ -34,6 +36,9 @@ def leach_clustering(
     If a harvesting model is provided, election probabilities are weighted
     by the projected energy over the upcoming round.
     """
+    if energy_view is None:
+        energy_view = OracleView(nodes)
+
     alive_nodes = {nid: node for nid, node in nodes.items() if node.is_alive}
     if not alive_nodes:
         return {}, []
@@ -48,18 +53,25 @@ def leach_clustering(
 
     # 1. Compute effective energy (projected harvest or current battery)
     effective_energies: Dict[int, float] = {}
+    ch_cost_est = (energy_model.receive_energy(4000) * (1.0 / desired_clusters_ratio) + 
+                   energy_model.transmit_energy(4000, 35.0)) if energy_model is not None else 0.001
+
     for nid, node in alive_nodes.items():
+        node_e = energy_view.mean(nid)
         if harvesting_model is not None:
             eff_e = harvesting_model.project_energy(
                 node_id=nid,
-                current_energy=node.residual_energy,
+                current_energy=node_e,
                 current_time=current_time,
                 target_time=current_time + lookahead_rounds,
                 battery_capacity=node.max_energy
             )
         else:
-            eff_e = node.residual_energy
-        effective_energies[nid] = max(0.0, eff_e)
+            eff_e = node_e
+        
+        # Probabilistic belief weighting: downweight nodes that cannot afford CH duty
+        p_ch = energy_view.p_afford(nid, ch_cost_est)
+        effective_energies[nid] = max(0.0, eff_e) * max(0.05, p_ch)
 
     total_effective_energy = sum(effective_energies.values())
     if total_effective_energy <= 0.0:
@@ -128,7 +140,8 @@ def simulate_clustering_round(
     harvesting_model: Optional[HarvestingProfile] = None,
     current_time: int = 0,
     lookahead_rounds: int = 1,
-    rng: Optional[random.Random] = None
+    rng: Optional[random.Random] = None,
+    energy_view: Optional[EnergyView] = None
 ) -> Tuple[Dict[int, int], List[int], Dict[int, float]]:
     """Runs a single round of clustering and returns cluster stats."""
     alive_count = sum(1 for node in nodes.values() if node.is_alive)
@@ -142,7 +155,8 @@ def simulate_clustering_round(
         harvesting_model=harvesting_model,
         current_time=current_time,
         lookahead_rounds=lookahead_rounds,
-        rng=rng
+        rng=rng,
+        energy_view=energy_view
     )
 
     debug_info = {
@@ -161,7 +175,8 @@ def eh_leach_clustering(
     current_time: int = 0,
     round_num: int = 0,
     solar_beta: float = 0.5,
-    rng: Optional[random.Random] = None
+    rng: Optional[random.Random] = None,
+    energy_view: Optional[EnergyView] = None
 ) -> Tuple[Dict[int, int], List[int]]:
     """
     EH-LEACH (Energy-Harvesting LEACH baseline from literature).
@@ -170,6 +185,9 @@ def eh_leach_clustering(
     projected solar energy relative to average network energy:
     T(n) = [p / (1 - p * (r mod (1/p)))] * [(E_i + beta * E_harvest) / (E_avg + beta * E_avg_harvest)]
     """
+    if energy_view is None:
+        energy_view = OracleView(nodes)
+
     _rng = rng if rng is not None else random
     alive_nodes = {nid: node for nid, node in nodes.items() if node.is_alive}
     if not alive_nodes:
@@ -191,7 +209,7 @@ def eh_leach_clustering(
     base_p = p / max(0.01, denom)
 
     # Estimate individual and average energy + harvest
-    total_energy = sum(node.residual_energy for node in alive_nodes.values())
+    total_energy = sum(energy_view.mean(nid) for nid in alive_nodes.keys())
     avg_energy = total_energy / num_alive if num_alive > 0 else 1.0
 
     harvest_estimates = {}
@@ -209,7 +227,7 @@ def eh_leach_clustering(
     selected_ch = []
     candidates = []
     for nid, node in alive_nodes.items():
-        composite_energy = node.residual_energy + solar_beta * harvest_estimates[nid]
+        composite_energy = energy_view.mean(nid) + solar_beta * harvest_estimates[nid]
         threshold = base_p * (composite_energy / avg_composite)
         threshold = min(1.0, max(0.0, threshold))
         rand_val = _rng.random()
@@ -224,7 +242,7 @@ def eh_leach_clustering(
 
     # Fallback if none elected
     if not selected_ch:
-        best_nid = max(alive_nodes.keys(), key=lambda i: alive_nodes[i].residual_energy + solar_beta * harvest_estimates[i])
+        best_nid = max(alive_nodes.keys(), key=lambda i: energy_view.mean(i) + solar_beta * harvest_estimates[i])
         selected_ch.append(best_nid)
         alive_nodes[best_nid].role = 'CH'
 

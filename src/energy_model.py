@@ -15,12 +15,16 @@ class EnergyModel:
         E_amp: float = 100e-12,     # 100 pJ/bit/m^2 amplifier
         E_fs: float = 10e-12,       # 10 pJ/bit/m^2 free-space amplifier
         E_mp: float = 0.0013e-12,   # 0.0013 pJ/bit/m^4 multipath amplifier
-        d0: Optional[float] = None
+        d0: Optional[float] = None,
+        E_idle: float = 0.0,        # Idle listening drain per round
+        E_sense: float = 0.0        # Sensing energy per measurement
     ):
         self.E_elec = E_elec
         self.E_amp = E_amp
         self.E_fs = E_fs
         self.E_mp = E_mp
+        self.E_idle = E_idle
+        self.E_sense = E_sense
         # Crossover threshold distance between free space (d^2) and multipath (d^4)
         self.d0 = d0 if d0 is not None else math.sqrt(E_fs / E_mp)
 
@@ -36,6 +40,14 @@ class EnergyModel:
     def receive_energy(self, k: int) -> float:
         """Energy in Joules to receive k bits."""
         return k * self.E_elec
+
+    def idle_energy(self, duration: float = 1.0) -> float:
+        """Energy in Joules consumed while idling/listening."""
+        return self.E_idle * duration
+
+    def sensing_energy(self) -> float:
+        """Energy in Joules consumed acquiring a physical sensor sample."""
+        return self.E_sense
 
     def compute_energy_cost(self, k: int, distance: float, is_transmit: bool = True) -> float:
         if is_transmit:

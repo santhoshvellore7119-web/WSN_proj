@@ -27,6 +27,10 @@ class HarvestingProfile(ABC):
         """Expected energy harvested between start_time and end_time."""
         pass
 
+    def variance_harvest(self, node_id: int, start_time: int, end_time: int) -> float:
+        """Variance of energy harvested between start_time and end_time (in Joules^2)."""
+        return 0.0
+
     def project_energy(
         self,
         node_id: int,
@@ -58,12 +62,18 @@ class ConstantHarvesting(HarvestingProfile):
             return 0.0
         return self.rate * (end_time - start_time)
 
+    def variance_harvest(self, node_id: int, start_time: int, end_time: int) -> float:
+        return 0.0
+
     def __repr__(self):
         return f"ConstantHarvesting(rate={self.rate:.4f}J/round)"
 
 
 class SolarPeriodicHarvesting(HarvestingProfile):
-    """Day/night solar harvesting using a sinusoidal curve during daylight hours."""
+    """
+    Day/night solar harvesting with sinusoidal diurnal curve, per-node exposure factor,
+    per-step noise, and an autoregressive AR(1) shared weather process.
+    """
 
     def __init__(
         self,
@@ -71,6 +81,9 @@ class SolarPeriodicHarvesting(HarvestingProfile):
         period: int = 24,
         day_fraction: float = 0.5,
         solar_noise: float = 0.0,
+        weather_noise: float = 0.0,
+        weather_rho: float = 0.8,
+        exposure_factors: Optional[Dict[int, float]] = None,
         seed: Optional[int] = None
     ):
         self.peak_rate = max(0.0, peak_rate)
@@ -78,7 +91,26 @@ class SolarPeriodicHarvesting(HarvestingProfile):
         self.day_fraction = max(0.01, min(0.99, day_fraction))
         self.day_length = self.period * self.day_fraction
         self.solar_noise = max(0.0, solar_noise)
+        self.weather_noise = max(0.0, weather_noise)
+        self.weather_rho = max(0.0, min(0.99, weather_rho))
+        self.exposure_factors = exposure_factors or {}
         self._rng = random.Random(seed) if seed is not None else random.Random()
+
+        # AR(1) weather state: mean 1.0
+        self._weather_state = 1.0
+        self._last_weather_time = -1
+
+    def _update_weather(self, current_time: int):
+        if self._last_weather_time == current_time:
+            return
+        self._last_weather_time = current_time
+        if self.weather_noise > 0.0:
+            shock = self._rng.gauss(0.0, self.weather_noise)
+            drift = self.weather_rho * (self._weather_state - 1.0)
+            stoch_term = math.sqrt(max(0.0, 1.0 - self.weather_rho ** 2)) * shock
+            self._weather_state = max(0.1, min(2.0, 1.0 + drift + stoch_term))
+        else:
+            self._weather_state = 1.0
 
     def _instantaneous_rate(self, t: float) -> float:
         t_mod = t % self.period
@@ -89,24 +121,44 @@ class SolarPeriodicHarvesting(HarvestingProfile):
         return 0.0
 
     def sample_harvest(self, node_id: int, current_time: int, duration: float = 1.0) -> float:
+        self._update_weather(current_time)
         base_rate = self._instantaneous_rate(current_time)
-        if self.solar_noise > 0.0 and base_rate > 0.0:
+        exposure = self.exposure_factors.get(node_id, 1.0)
+        
+        # Combine base solar rate, shared weather factor, and node exposure
+        effective_rate = base_rate * self._weather_state * exposure
+
+        if self.solar_noise > 0.0 and effective_rate > 0.0:
             noise_factor = max(0.0, self._rng.gauss(1.0, self.solar_noise))
-            actual = base_rate * noise_factor * duration
+            actual = effective_rate * noise_factor * duration
         else:
-            actual = base_rate * duration
+            actual = effective_rate * duration
         return max(0.0, actual)
 
     def expected_harvest(self, node_id: int, start_time: int, end_time: int) -> float:
         if end_time <= start_time:
             return 0.0
+        exposure = self.exposure_factors.get(node_id, 1.0)
         total = 0.0
         for t in range(start_time, end_time):
-            total += self._instantaneous_rate(t)
+            total += self._instantaneous_rate(t) * exposure
         return total
 
+    def variance_harvest(self, node_id: int, start_time: int, end_time: int) -> float:
+        if end_time <= start_time:
+            return 0.0
+        exposure = self.exposure_factors.get(node_id, 1.0)
+        var_per_step = (self.solar_noise ** 2) + (self.weather_noise ** 2)
+        if var_per_step <= 0.0:
+            return 0.0
+        total_var = 0.0
+        for t in range(start_time, end_time):
+            rate = self._instantaneous_rate(t) * exposure
+            total_var += (rate ** 2) * var_per_step
+        return total_var
+
     def __repr__(self):
-        return f"SolarPeriodicHarvesting(peak={self.peak_rate:.4f}J, period={self.period}, day_frac={self.day_fraction})"
+        return f"SolarPeriodicHarvesting(peak={self.peak_rate:.4f}J, period={self.period}, noise={self.solar_noise})"
 
 
 class StochasticHarvesting(HarvestingProfile):
@@ -147,6 +199,12 @@ class StochasticHarvesting(HarvestingProfile):
         num_rounds = end_time - start_time
         return self.lambda_rate * num_rounds * self.quantum
 
+    def variance_harvest(self, node_id: int, start_time: int, end_time: int) -> float:
+        if end_time <= start_time:
+            return 0.0
+        num_rounds = end_time - start_time
+        return self.lambda_rate * num_rounds * (self.quantum ** 2)
+
     def __repr__(self):
         mean_power = self.lambda_rate * self.quantum
         return f"StochasticHarvesting(lambda={self.lambda_rate}, quantum={self.quantum:.4f}J, mean={mean_power:.4f}J/round)"
@@ -175,6 +233,9 @@ class HeterogeneousHarvesting(HarvestingProfile):
     def expected_harvest(self, node_id: int, start_time: int, end_time: int) -> float:
         return self.get_profile(node_id).expected_harvest(node_id, start_time, end_time)
 
+    def variance_harvest(self, node_id: int, start_time: int, end_time: int) -> float:
+        return self.get_profile(node_id).variance_harvest(node_id, start_time, end_time)
+
     def __repr__(self):
         return f"HeterogeneousHarvesting(default={self.default_profile}, custom_nodes={len(self.node_profiles)})"
 
@@ -186,6 +247,9 @@ def create_shadowed_solar_profile(
     shadow_penalty: float = 0.1,
     period: int = 24,
     day_fraction: float = 0.5,
+    solar_noise: float = 0.0,
+    weather_noise: float = 0.0,
+    weather_rho: float = 0.8,
     seed: Optional[int] = None
 ) -> HeterogeneousHarvesting:
     """
@@ -197,12 +261,18 @@ def create_shadowed_solar_profile(
         peak_rate=peak_rate,
         period=period,
         day_fraction=day_fraction,
+        solar_noise=solar_noise,
+        weather_noise=weather_noise,
+        weather_rho=weather_rho,
         seed=seed
     )
     shadowed_profile = SolarPeriodicHarvesting(
         peak_rate=peak_rate * shadow_penalty,
         period=period,
         day_fraction=day_fraction,
+        solar_noise=solar_noise,
+        weather_noise=weather_noise,
+        weather_rho=weather_rho,
         seed=seed + 1 if seed is not None else None
     )
 
@@ -314,6 +384,15 @@ class RealTraceSolarHarvesting(HarvestingProfile):
             total += self._get_rate_at_step(t)
         return total
 
+    def variance_harvest(self, node_id: int, start_time: int, end_time: int) -> float:
+        if end_time <= start_time or self.noise_std <= 0.0:
+            return 0.0
+        total_var = 0.0
+        for t in range(start_time, end_time):
+            rate = self._get_rate_at_step(t)
+            total_var += (rate * self.noise_std) ** 2
+        return total_var
+
     def __repr__(self):
         return f"RealTraceSolarHarvesting(period={self.period}, peak={self.peak_rate:.4f}J)"
 
@@ -334,8 +413,14 @@ def create_harvesting_model(
         period = kwargs.get('period', 24)
         day_frac = kwargs.get('day_fraction', 0.5)
         noise = kwargs.get('solar_noise', 0.0)
+        weather_noise = kwargs.get('weather_noise', 0.0)
+        weather_rho = kwargs.get('weather_rho', 0.8)
         seed = kwargs.get('seed', None)
-        return SolarPeriodicHarvesting(peak_rate=peak, period=period, day_fraction=day_frac, solar_noise=noise, seed=seed)
+        return SolarPeriodicHarvesting(
+            peak_rate=peak, period=period, day_fraction=day_frac,
+            solar_noise=noise, weather_noise=weather_noise, weather_rho=weather_rho,
+            seed=seed
+        )
     elif model_type in ('real_trace', 'nrel_trace', 'trace', 'empirical_solar'):
         trace_name = kwargs.get('trace_name', 'clear_sky')
         peak = kwargs.get('peak_rate', 0.04)
@@ -354,10 +439,15 @@ def create_harvesting_model(
         shadow_pen = kwargs.get('shadow_penalty', 0.1)
         period = kwargs.get('period', 24)
         day_frac = kwargs.get('day_fraction', 0.5)
+        solar_noise = kwargs.get('solar_noise', 0.0)
+        weather_noise = kwargs.get('weather_noise', 0.0)
+        weather_rho = kwargs.get('weather_rho', 0.8)
         seed = kwargs.get('seed', None)
         return create_shadowed_solar_profile(
             nodes=nodes, peak_rate=peak, shadow_fraction=shadow_frac,
-            shadow_penalty=shadow_pen, period=period, day_fraction=day_frac, seed=seed
+            shadow_penalty=shadow_pen, period=period, day_fraction=day_frac,
+            solar_noise=solar_noise, weather_noise=weather_noise, weather_rho=weather_rho,
+            seed=seed
         )
     elif model_type in ('heterogeneous_rf', 'rf_hotspot', 'hotspot'):
         nodes = kwargs.get('nodes', {})
