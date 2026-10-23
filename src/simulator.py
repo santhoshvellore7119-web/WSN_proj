@@ -61,7 +61,12 @@ class Simulator:
         seed: Optional[int] = None,
         energy_view: Optional[EnergyView] = None,
         energy_view_type: str = 'oracle',
-        report_interval: int = 1
+        report_interval: int = 1,
+        energy_heterogeneity: float = 0.0,
+        initial_energy_distribution: str = 'homogeneous',
+        channel_fading_sigma: float = 0.0,
+        max_retransmissions: int = 0,
+        sensor_noise_std: float = 0.0
     ):
         self.num_nodes = num_nodes
         self.area_width = area_width
@@ -73,6 +78,13 @@ class Simulator:
         self.k_bits = k_bits
         self.data_per_node_per_round = data_per_node_per_round
         self.aggregation_bits = aggregation_bits
+        if routing_algorithm == 'belief_dp':
+            enable_belief_dp = True
+        elif routing_algorithm == 'dp_time_augmented':
+            enable_time_dp = True
+        elif routing_algorithm == 'dp_maximin':
+            enable_dp_routing = True
+
         self.enable_dp_routing = enable_dp_routing
         self.enable_time_dp = enable_time_dp
         self.enable_belief_dp = enable_belief_dp
@@ -88,6 +100,11 @@ class Simulator:
         self.seed = seed
         self.report_interval = report_interval
         self.energy_view_type = energy_view_type
+        self.energy_heterogeneity = energy_heterogeneity
+        self.initial_energy_distribution = initial_energy_distribution
+        self.channel_fading_sigma = channel_fading_sigma
+        self.max_retransmissions = max_retransmissions
+        self.sensor_noise_std = sensor_noise_std
 
         # Initialize nodes and network graph
         self.nodes: Dict[int, Node] = {}
@@ -144,22 +161,39 @@ class Simulator:
         os.makedirs('results', exist_ok=True)
 
     def _create_nodes(self):
-        """Places sensor nodes uniformly in the simulation area."""
+        """Places sensor nodes uniformly in the simulation area with optional initial battery heterogeneity."""
         import random
         # Two separate RNG streams seeded deterministically:
-        # - placement_rng: controls node (x, y) coordinates
-        # - self._rng: controls all per-round stochastic draws (CH election, etc.)
+        # - placement_rng: controls node (x, y) coordinates and battery heterogeneity
+        # - self._rng: controls all per-round stochastic draws (CH election, fading, etc.)
         # Using seed+1 for the second stream keeps them independent.
         placement_rng = random.Random(self.seed) if self.seed is not None else random.Random()
         self._rng: Optional[random.Random] = random.Random(self.seed + 1) if self.seed is not None else None
         for i in range(self.num_nodes):
             x = placement_rng.uniform(0, self.area_width)
             y = placement_rng.uniform(0, self.area_height)
+
+            if self.energy_heterogeneity > 0.0 or self.initial_energy_distribution != 'homogeneous':
+                dist_type = self.initial_energy_distribution.lower()
+                if dist_type in ('staggered', 'staggered_deployment'):
+                    min_e = max(0.005, self.initial_energy * max(0.1, 1.0 - self.energy_heterogeneity))
+                    max_e = min(self.max_battery_capacity * 0.95, self.initial_energy + self.energy_heterogeneity * (self.max_battery_capacity - self.initial_energy))
+                    node_init_e = placement_rng.uniform(min_e, max(min_e + 1e-4, max_e))
+                elif dist_type in ('gaussian', 'normal'):
+                    std = self.initial_energy * max(0.01, self.energy_heterogeneity) * 0.5
+                    node_init_e = placement_rng.gauss(self.initial_energy, std)
+                    node_init_e = max(0.005, min(self.max_battery_capacity, node_init_e))
+                else: # 'uniform', 'uniform_jitter'
+                    delta = self.initial_energy * self.energy_heterogeneity
+                    node_init_e = placement_rng.uniform(max(0.005, self.initial_energy - delta), min(self.max_battery_capacity, self.initial_energy + delta))
+            else:
+                node_init_e = self.initial_energy
+
             self.nodes[i] = Node(
                 node_id=i,
                 x=x,
                 y=y,
-                initial_energy=self.initial_energy,
+                initial_energy=node_init_e,
                 max_energy=self.max_battery_capacity
             )
 
@@ -331,7 +365,18 @@ class Simulator:
             if self.transmission_range is not None and dist > self.transmission_range:
                 continue
 
-            e_tx = self.energy_model.transmit_energy(self.data_per_node_per_round, dist)
+            e_tx_base = self.energy_model.transmit_energy(self.data_per_node_per_round, dist)
+            prr = self.energy_model.packet_success_probability(
+                dist, self.transmission_range, self.channel_fading_sigma, rng=self._rng
+            )
+            tx_attempts = 1
+            _draw = self._rng.random if self._rng else random.random
+            tx_success = _draw() < prr
+            while not tx_success and tx_attempts <= self.max_retransmissions:
+                tx_attempts += 1
+                tx_success = _draw() < prr
+
+            e_tx = e_tx_base * tx_attempts
             p_pred_tx = self.energy_view.p_afford(nid, e_tx)
             self.calibration_samples.append((p_pred_tx, 1 if node.residual_energy >= e_tx else 0))
             if node.residual_energy < e_tx:
@@ -342,6 +387,8 @@ class Simulator:
                 continue
 
             node.consume_energy(e_tx)
+            if not tx_success:
+                continue
 
             e_rx = self.energy_model.receive_energy(self.data_per_node_per_round)
             p_pred_rx = self.energy_view.p_afford(ch_id, e_rx)
@@ -426,9 +473,20 @@ class Simulator:
                         flow_delivered = False
                         break
 
-                # Deduct transmission cost
-                e_tx = self.energy_model.transmit_energy(self.aggregation_bits, dist)
-                p_pred_tx = self.energy_view.p_afford(tx_id, e_tx)
+                # Deduct transmission cost with channel fading and retransmissions
+                e_tx_base = self.energy_model.transmit_energy(self.aggregation_bits, dist)
+                prr = self.energy_model.packet_success_probability(
+                    dist, self.transmission_range, self.channel_fading_sigma, rng=self._rng
+                )
+                tx_attempts = 1
+                _draw = self._rng.random if self._rng else random.random
+                tx_success = _draw() < prr
+                while not tx_success and tx_attempts <= self.max_retransmissions:
+                    tx_attempts += 1
+                    tx_success = _draw() < prr
+
+                e_tx = e_tx_base * tx_attempts
+                p_pred_tx = self.energy_view.p_afford(tx_id, total_tx_energy := e_tx)
                 self.calibration_samples.append((p_pred_tx, 1 if tx_node.residual_energy >= e_tx else 0))
                 if tx_node.residual_energy < e_tx:
                     flow_wasted += tx_node.residual_energy
@@ -439,6 +497,9 @@ class Simulator:
 
                 tx_node.consume_energy(e_tx)
                 hops_taken += 1
+                if not tx_success:
+                    flow_delivered = False
+                    break
 
                 if rx_id != -1:
                     e_rx = self.energy_model.receive_energy(self.aggregation_bits)
@@ -460,11 +521,18 @@ class Simulator:
                 for _ in range(packets_in_flow):
                     hop_latencies.append(hops_taken + 1)
 
-                # Piggybacked telemetry updates on successful delivery
+                # Piggybacked telemetry updates on successful delivery with sensor ADC noise
                 if self.report_interval > 0 and (self.round_number % self.report_interval == 0):
                     for nid in path:
                         if nid != -1:
-                            self.energy_view.on_report(nid, self.nodes[nid].residual_energy, self.round_number)
+                            if self.sensor_noise_std > 0.0:
+                                import random
+                                _gauss = self._rng.gauss if self._rng else random.gauss
+                                noisy_val = self.nodes[nid].residual_energy + _gauss(0.0, self.sensor_noise_std)
+                                noisy_val = max(0.0, min(self.nodes[nid].max_energy, noisy_val))
+                                self.energy_view.on_report(nid, noisy_val, self.round_number)
+                            else:
+                                self.energy_view.on_report(nid, self.nodes[nid].residual_energy, self.round_number)
             else:
                 energy_wasted += flow_wasted
 

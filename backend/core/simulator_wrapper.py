@@ -50,6 +50,11 @@ class SimulatorWrapper:
         seed = config.get('seed', 42)
         energy_view = config.get('energy_view', 'oracle')
         report_interval = config.get('report_interval', 1)
+        energy_heterogeneity = config.get('energy_heterogeneity', 0.0)
+        initial_energy_distribution = config.get('initial_energy_distribution', 'homogeneous')
+        channel_fading_sigma = config.get('channel_fading_sigma', 0.0)
+        max_retransmissions = config.get('max_retransmissions', 0)
+        sensor_noise_std = config.get('sensor_noise_std', 0.0)
 
         # Harvesting configuration
         harvesting_profile = config.get('harvesting_profile')
@@ -129,6 +134,11 @@ class SimulatorWrapper:
             routing_algorithm=routing_algorithm,
             energy_view_type=energy_view,
             report_interval=report_interval,
+            energy_heterogeneity=energy_heterogeneity,
+            initial_energy_distribution=initial_energy_distribution,
+            channel_fading_sigma=channel_fading_sigma,
+            max_retransmissions=max_retransmissions,
+            sensor_noise_std=sensor_noise_std,
             seed=seed
         )
 
@@ -207,6 +217,10 @@ class SimulatorWrapper:
                         'x': node.x,
                         'y': node.y
                     }
+                    for node_id, node in sim.nodes.items()
+                },
+                'node_initial_energies': {
+                    str(node_id): round(node.initial_energy, 5)
                     for node_id, node in sim.nodes.items()
                 },
                 'node_shadow_multipliers': {

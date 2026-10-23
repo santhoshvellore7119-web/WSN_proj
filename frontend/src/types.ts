@@ -42,6 +42,11 @@ export interface SimulationConfig {
   k_bits?: number;
   data_per_node_per_round?: number;
   aggregation_bits?: number;
+  energy_heterogeneity?: number;
+  initial_energy_distribution?: 'homogeneous' | 'uniform' | 'staggered' | 'gaussian';
+  channel_fading_sigma?: number;
+  max_retransmissions?: number;
+  sensor_noise_std?: number;
 }
 
 export interface NodePosition {
@@ -131,6 +136,7 @@ export interface DetailedData {
   routes_history: Record<number, [number[] | null, number]>[]; // [round] -> { chId: [path, cost] }
   node_positions: Record<string, NodePosition>;
   node_shadow_multipliers?: Record<string, number>;
+  node_initial_energies?: Record<string, number>;
   base_station_position: [number, number];
   fnd_round: number | null;
   hnd_round: number | null;

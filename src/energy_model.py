@@ -1,9 +1,9 @@
 """
-First-order radio energy dissipation model (LEACH standard).
+First-order radio energy dissipation model (LEACH standard) with channel fading.
 """
 
 import math
-from typing import Optional
+from typing import Optional, Any
 
 
 class EnergyModel:
@@ -53,3 +53,31 @@ class EnergyModel:
         if is_transmit:
             return self.transmit_energy(k, distance)
         return self.receive_energy(k)
+
+    def packet_success_probability(
+        self,
+        distance: float,
+        transmission_range: Optional[float] = None,
+        fading_sigma: float = 0.0,
+        rng: Optional[Any] = None
+    ) -> float:
+        """
+        Computes packet reception rate (PRR) under optional log-normal shadow fading.
+        If fading_sigma == 0.0, PRR is 1.0 within transmission_range and 0.0 beyond.
+        If fading_sigma > 0.0, models realistic transition zone with log-normal attenuation.
+        """
+        if transmission_range is not None and distance > transmission_range * 1.5:
+            return 0.0
+        if fading_sigma <= 0.0:
+            if transmission_range is None or distance <= transmission_range:
+                return 1.0
+            return 0.0
+
+        import random
+        _rng = rng if rng is not None else random
+        noise_db = _rng.gauss(0.0, fading_sigma)
+
+        r_eff = transmission_range if transmission_range is not None else 35.0
+        snr_proxy = (r_eff - distance) / (0.15 * r_eff) + (noise_db / 3.0)
+        prr = 1.0 / (1.0 + math.exp(-max(-15.0, min(15.0, snr_proxy))))
+        return max(0.0, min(1.0, prr))

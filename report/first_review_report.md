@@ -1,133 +1,61 @@
-# Project Review 1 Report
+# Project Review 1 Report Summary
+## Adaptive Routing in Energy-Harvesting Wireless Sensor Networks
 
-**Project Title:** Adaptive Routing in Energy-Harvesting Wireless Sensor Networks  
-**Student Name:** Santhosh  
-**Course:** Data Structures & Algorithms (2nd Year B.Tech)  
-**Date:** August / September 2026  
-**Repository:** `https://github.com/santhoshvellore7119-web/WSN_proj`
-
----
-
-## 1. Problem Statement & Objectives
-
-In conventional Wireless Sensor Networks (WSNs), sensor nodes are powered by non-rechargeable electrochemical batteries, meaning residual energy monotonically decreases. Standard routing algorithms (e.g. Dijkstra, LEACH, static bottleneck DP) assume static battery snapshots, routing traffic away from any node with depleted reserves.
-
-When nodes harvest ambient energy (solar irradiance, thermal gradients, or ambient RF), battery levels fluctuate dynamically. A node with low residual energy at the start of a transmission round can recharge just-in-time during multi-hop transit. Blindness to incoming energy leads to:
-1. **False Rejection of Recharging Nodes:** Standard shortest paths avoid nodes that would be fully charged upon packet arrival.
-2. **Burnout of Non-Harvesting Nodes:** Stagnant, shaded nodes carrying high initial charges are overused until premature depletion.
-
-### Core Project Objectives:
-- **Algorithmic Contribution:** Formulate and implement **Time-Augmented Maximin Dynamic Programming** ($dp[v][h][t]$) to maximize bottleneck route capacity on a time-expanded acyclic state graph.
-- **Fast Fault Recovery:** Implement **Disjoint-Set Union (Union-Find)** with path compression and union-by-rank for local detour rerouting ($O(|E|\alpha(V)) + O(\text{deg}(u)\alpha(V))$).
-- **Literature Baselines:** Benchmark against published EH-WSN protocols (**EH-LEACH** and predictive energy-weighted shortest path).
-- **Multi-Scenario Evaluation:** Evaluate under 24-hour diurnal solar weather traces (clear, cloudy, overcast), spatial heterogeneity sweeps ($p_{\text{shadow}} \in [0.0, 1.0]$), and multi-seed statistical significance tests (paired Wilcoxon signed-rank and Student's t-test).
-- **Full-Stack Engineering:** Provide 2 unified interfaces (CLI research tools and FastAPI + React web application) with full-stack CI and Docker containerization.
+**Course:** Data Structures & Algorithms (2nd Year B.Tech Capstone — Review 1)  
+**Institution:** Vellore Institute of Technology (VIT), Vellore  
+**Academic Year:** 2026–2027  
+**Repository:** [https://github.com/santhoshvellore7119-web/WSN_proj](https://github.com/santhoshvellore7119-web/WSN_proj) (Branch: `master`)  
+**Date:** October 2026  
 
 ---
 
-## 2. DSA Architecture & Modules
-
-The simulation engine is structured around foundational Data Structures and Algorithms:
-
-```
-wsn-energy-routing/
-├── src/
-│   ├── network.py           # Node & Graph adjacency list representations
-│   ├── energy_model.py      # LEACH 1st-order radio model (d^2 free-space / d^4 multipath)
-│   ├── harvesting_model.py  # Solar, Stochastic Poisson, Diurnal Weather, Shadowed & RF profiles
-│   ├── clustering.py        # LEACH and EH-LEACH clustering with min-heap tiebreaking
-│   ├── routing.py           # Dijkstra, A*, Energy-Aware Dijkstra, Union-Find live detour engine
-│   ├── dp_lifetime.py       # 2D Classical Maximin DP and 3D Time-Augmented DP (dp[v][h][t])
-│   ├── simulator.py         # 5-phase discrete event simulation engine
-│   └── visualize.py         # Matplotlib plotting routines and heatmap generators
-├── backend/                 # FastAPI REST API with async background tasks and SQLite models
-├── frontend/                # React dashboard with interactive network SVG and Recharts graphs
-├── tests/                   # Pytest suite (50 unit tests covering core + baselines + API)
-├── Dockerfile.backend       # Python 3.12 container definition
-├── Dockerfile.frontend      # Node 18 / Nginx container definition
-└── docker-compose.yml       # Single-command full-stack deployment
-```
-
-### Key Complexity & State Formulations:
-- **Graph Topology (`network.py`):** Adjacency list storing distance-weighted edges.
-- **Time-Augmented DP (`dp_lifetime.py`):** $3\text{D Table } dp[v][h][t]$ on a time-expanded DAG with recurrence:
-  $$dp[v][h][t] = \max_{u \in \text{nbr}(v)} \min\left(dp[u][h-1][t-\delta], \, E_{\text{proj}}(v, t_{\text{curr}} + t)\right)$$
-  - *Time Complexity:* $O(|E| \cdot H \cdot T)$
-  - *Space Complexity:* $O(|V| \cdot H \cdot T)$
-- **Union-Find Detour Recovery (`routing.py`):** $O(|E| \cdot \alpha(V))$ setup, $O(\text{deg}(u) \cdot \alpha(V))$ local detour repair, achieving a **$3.8\text{--}6.1\times$ latency reduction** over full Time-DP recomputation ($O(|E|HT)$) while trading $\sim 10\times$ per-call latency relative to simple Dijkstra ($\sim 0.1\times$).
+### Team Members
+- **Ananthakrishnan R** (Reg. No: **25BEL0005**) — B.Tech ECE (BEL)
+- **Santhosh.G** (Reg. No: **25BEL0016**) — B.Tech ECE (BEL)
+- **Thilang TV** (Reg. No: **25BEL0036**) — B.Tech ECE (BEL)
 
 ---
 
-## 3. Experimental Validation & Results
+## 1. Project Summary & Key Ideas
 
-### 3.1 Unit Testing
-All **52 unit tests** pass with `pytest` in $< 3.5\text{s}$, verifying:
-- Radio energy calculations and crossover threshold $d_0 = \sqrt{E_{fs}/E_{mp}} \approx 87.7\text{m}$.
-- Deterministic 5-node adversarial counterexample isolating the lookahead mechanism.
-- Classical and Time-Augmented DP table filling, battery clamping, and backpointer reconstruction.
-- Disjoint-Set Union connectivity, rank optimization, and local detour splicing.
-- Literature baselines: EH-LEACH election and diurnal solar weather profile sampling.
-- FastAPI backend routes (`/health`, `/simulate`, `/benchmark`, `/runs`, `/experiments/scalability`, `/experiments/heterogeneity`, `/simulate/{job_id}/csv`) via `TestClient`.
+In outdoor wireless sensor networks (like precision agriculture or forest monitoring), sensor nodes traditionally run on primary batteries that only deplete over time. Standard algorithms like Dijkstra's shortest path assume that any node with a low battery is about to die and avoid routing through it.
 
-### 3.2 Canonical Benchmark (50 Nodes, 350 Rounds, $R_{\text{tx}} = 35.0\text{m}$, Seed 42)
-
-| Configuration | First Node Death (FND) | Half Nodes Dead (HND) | Alive (Round 350) | Residual Energy (J) |
-| :--- | :--- | :--- | :--- | :--- |
-| **1. Baseline (No Harvesting)** | Round 92 | Round 108 | 0 / 50 | 0.0000 J |
-| **2. Solar (Unaware LEACH + Dijkstra)** | Round 182 | Round 205 | 0 / 50 | 0.0000 J |
-| **3. Solar (Adaptive Time-DP)** | Round 151 | Round 194 | **1 / 50** | **0.0276 J** |
-| **4. Shadowed (Unaware Dijkstra)** | Round 112 | $> 350$ | 27 / 50 | 0.6630 J |
-| **5. Shadowed (Adaptive Time-DP)** | Round 107 | $> 350$ | 27 / 50 | 0.5930 J |
-| **6. Stochastic Poisson (Unaware LEACH)** | Round 302 | $> 350$ | 36 / 50 | 0.0963 J |
-| **7. Stochastic Poisson (Adaptive Time-DP)** | Round 302 | $> 350$ | 26 / 50 | 0.0479 J |
-
-### 3.3 Harvesting Heterogeneity Sweep ($p_{\text{shadow}} \in [0.0, 1.0]$)
-- **Empirical Findings & Trade-Off Analysis:**
-  - In low-to-moderate spatial occlusion ($p_{\text{shadow}} \le 0.8$), multi-hop relaying introduces an unavoidable reception dissipation penalty ($E_{\text{rx}} = k \cdot E_{\text{elec}}$) on intermediate relays. Direct-to-sink transmission minimizes aggregate reception energy when nodes can reach the base station.
-  - In extreme occlusion ($p_{\text{shadow}} = 1.0$), where active relays suffer heavy solar deprivation, single-seed canonical topology showed a directional gain (+6 rounds FND, 102 vs 96), but multi-seed validation ($N=30$ seeds) reveals no statistically reliable lifetime benefit across arbitrary topologies ($\text{FND} = 98.5 \pm 6.5$ vs $97.9 \pm 7.4$, $\Delta\text{FND} = +0.60$ rounds, paired $t = 0.436, p = 0.666$, Cohen's $d = 0.086$, Wilcoxon $p = 0.672$). Individual seed outcomes showed wide variance across random graph deployments, spanning $\Delta\text{FND} \in [-19, +19]$ rounds ($-19$ rounds in the worst-case topology, $+19$ in the best-case).
-- **Stochastic Regime Regression (36 vs 26 Alive Nodes):** In stochastic Poisson harvesting ($\lambda = 2.0, q = 0.00015\text{ J}$), discrete arrival bursts cause realized harvest to periodically fall short of expected projections. Relays accepting forwarding tasks under optimistic lookahead projections deplete prematurely, leaving 26 surviving nodes compared to 36 under static shortest-path Dijkstra.
-
-### 3.4 Multi-Seed Statistical Validation ($N = 30$ Seeds, 350 Rounds)
-Evaluated across 30 independent topologies (seeds 42, 7, 123, ..., 2026) to eliminate random deployment bias:
-
-| Configuration | First Node Death (FND) | Alive (Round 350) | Total Residual Energy (Mean $\pm$ Std [95% CI]) |
-| :--- | :--- | :--- | :--- |
-| **Baseline (No Harvesting)** | $89.2 \pm 5.4$ | $0.4 \pm 0.5$ | $0.0001 \pm 0.0002\text{ J}$ $[0.0000, 0.0002]$ |
-| **Solar (Unaware LEACH)** | $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | **$1.7050 \pm 0.0813\text{ J}$** $[1.6759, 1.7341]$ |
-| **Solar (Adaptive Time-DP)** | $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | $1.6299 \pm 0.0939\text{ J}$ $[1.5963, 1.6635]$ |
-| **Shadowed Solar (Unaware)** | **$110.2 \pm 9.6$** | **$24.1 \pm 3.2$** | **$0.3900 \pm 0.1996\text{ J}$** $[0.3186, 0.4614]$ |
-| **Shadowed Solar (Time-DP)** | $109.0 \pm 9.5$ | $23.7 \pm 3.8$ | $0.3521 \pm 0.1958\text{ J}$ $[0.2820, 0.4222]$ |
-| **Stochastic (Unaware LEACH)**| $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | **$15.8599 \pm 0.1470\text{ J}$** $[15.8073, 15.9125]$ |
-| **Stochastic (Adaptive Time-DP)**| $351.0 \pm 0.0$ | $50.0 \pm 0.0$ | $15.7890 \pm 0.1527\text{ J}$ $[15.7343, 15.8437]$ |
-
-- **Paired Hypothesis Testing:**
-  - **Solar Regime:** $\Delta E = -0.0751\text{ J}$ (95% CI: $[-0.0829, -0.0673]$, paired $t = -18.89, p = 7.66 \times 10^{-18}$, Wilcoxon $W = 0, p = 1.86 \times 10^{-9}$). Unaware LEACH preserves more aggregate energy due to avoiding intermediate relay reception dissipation ($E_{\text{rx}}$).
-  - **Shadowed Solar:** $\Delta E = -0.0380\text{ J}$ (95% CI: $[-0.0453, -0.0306]$, $p = 5.15 \times 10^{-11}$).
-  - **Stochastic Regime:** $\Delta E = -0.0709\text{ J}$ (95% CI: $[-0.1321, -0.0097]$, $p = 0.0308$).
-
-### 3.5 Scalability Benchmark ($N = 50 \to 500$ Nodes)
-Empirical latency scaling measurements with isolated timer blocks confirm theoretical asymptotic complexity:
-- Dijkstra: $0.18\text{ ms}$ ($N=50$) $\to 3.28\text{ ms}$ ($N=500$) — scales in line with $O(|E| + |V|\log |V|)$.
-- Classical DP: $1.42\text{ ms}$ ($N=50$) $\to 6.75\text{ ms}$ ($N=500$) — $O(|E| H)$.
-- Time-Augmented DP ($T=10, H=5$): $5.13\text{ ms}$ ($N=50$) $\to 18.62\text{ ms}$ ($N=500$) — $O(|E| H T)$.
-- DSU Local Detour: $0.92\text{ ms}$ ($N=50$) $\to 19.52\text{ ms}$ ($N=500$) — achieves a consistent $4\text{--}6\times$ speedup over full Time-DP recalculation, while trading $\sim 10\times$ latency against simple Dijkstra ($\sim 0.1\times$).
+In solar energy-harvesting networks, **battery energy is non-monotonic**:
+1. **The False Rejection Problem:** A node with 5% battery at $t=0$ might recharge back to 40% while a multi-hop packet travels toward it. Dijkstra rejects it anyway, forcing packets onto longer, wasteful routes.
+2. **The Shaded Burnout Problem:** A node sitting in permanent tree shade starts with 80% battery but gets zero solar recharge. Dijkstra routes through it repeatedly until it burns out and severs network communication.
+3. **Mid-Round Relay Brownouts:** Sudden cloud cover or transmission spikes cause nodes to brown out mid-round. Recomputing the full network routing table is too slow, and dropping the packet wastes already-spent energy.
 
 ---
 
-## 4. Modeling Assumptions & Threats to Validity
+## 2. What We Implemented (DSA Core)
 
-To ensure scientific honesty and rigor, the boundaries and physical trade-offs of the simulation are explicitly identified:
-1. **Radio Model & Relay Reception Overhead:** First-order radio equations ($d^2 / d^4$) impose $E_{\text{rx}} = k \cdot E_{\text{elec}}$ on every intermediate relay. Multi-hop routing through harvesting bridges is advantageous only when the energy harvested by the relay or the distance savings from multipath ($d^4 \to d^2$) outweigh the cumulative $E_{\text{rx}}$ reception cost.
-2. **Timescale Discrepancy:** Ambient solar harvesting operates over diurnal cycles (hours), whereas packet propagation across hops occurs on millisecond scales. Lookahead routing assumes discrete scheduling epochs or delay-tolerant buffering between rounds.
-3. **MAC Layer:** Assumes an idealized collision-free TDMA schedule within clusters and non-interfering orthogonal CDMA channels across clusters.
-4. **Mobility:** Sensor nodes and the sink are statically deployed.
-5. **Time Synchronization:** Assumes loose coarse-grained round synchronization sufficient for discrete lookahead intervals $\delta$.
+1. **3D Time-Augmented Dynamic Programming ($dp[v][h][t]$):**
+   - Recurrence: $dp[v][h][t] = \max_{u} \min(dp[u][h-1][t-\delta], E_{\text{proj}}(v, t) - E_{\text{rx}})$
+   - Looks ahead across time slots to utilize recharging relays just-in-time.
+   - Computes in $O(|E|HT)$ time (5.1 ms on 50 nodes) and uses $< 45\text{ KB}$ RAM.
+2. **Disjoint-Set Union (DSU / Union-Find) Live Detour Recovery:**
+   - Path compression and union-by-rank.
+   - Slices local detours around mid-round failed nodes in $O(\text{deg}(u)\alpha(V))$ time.
+   - **$4\times - 6\times$ faster** than full table recomputation (0.9 ms vs 5.1 ms) with **0% packet loss**.
+3. **Harvesting-Aware Dynamic Clustering (EH-LEACH):**
+   - Cluster head election probability scaled by solar intake and residual battery.
+   - Min-heap priority queue tiebreaking.
+4. **Full-Stack Engineering Platform:**
+   - Modular simulation engine in Python (`src/`).
+   - Asynchronous FastAPI backend (`backend/`) with SQLite job persistence.
+   - React 19 web dashboard (`frontend/`) with live SVG network topology, round scrubber, and energy heatmaps.
+   - 68 automated unit tests passing with pytest (100% pass rate in 4.7s).
 
 ---
 
-## 5. Summary & Next Steps for Review 2
+## 3. Team Member Contributions
 
-1. **Current Status:** Core algorithms, literature baselines, multi-seed statistical suites, empirical scalability tests, REST API backend, React frontend, CI workflows, and Docker orchestration are fully implemented and verified.
-2. **Plan for Review 2:**
-   - Multi-packet burst transmission and queueing delay modeling.
-   - Dynamic channel fading and shadow margin modeling.
+| Student Name | Register No. | Individual Responsibilities |
+| :--- | :---: | :--- |
+| **Ananthakrishnan R** | **25BEL0005** | Heinzelman radio model ($E_{\text{tx}}, E_{\text{rx}}, d_0$), solar harvesting profiles, literature survey, and multi-seed statistical evaluation ($N=30$ seeds). |
+| **Santhosh.G** | **25BEL0016** | 3D Time-Augmented DP formulation, mathematical approximation derivation, 24-bin histogram belief filter, and core simulation engine. |
+| **Thilang TV** | **25BEL0036** | Disjoint-Set Union (DSU) live detour recovery algorithm, FastAPI REST backend, SQLite database persistence, and React 19 dashboard. |
+
+---
+
+*For the complete detailed report with mathematical formulations, hardware physics, and benchmark tables, refer to [`project_review_1_report.md`](project_review_1_report.md) and [`project_review_1_report.pdf`](project_review_1_report.pdf).*

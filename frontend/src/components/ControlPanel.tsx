@@ -10,7 +10,8 @@ import {
   ChevronDown,
   ChevronUp,
   Flame,
-  ShieldCheck
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { SimulationConfig, HarvestingProfileType, RoutingAlgorithmType, TopologyDistribution } from '../types';
 
@@ -29,7 +30,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   loading,
   progressText
 }) => {
-  const [activeSection, setActiveSection] = useState<'topology' | 'harvesting' | 'routing' | 'advanced'>('topology');
+  const [activeSection, setActiveSection] = useState<'topology' | 'harvesting' | 'routing' | 'uncertainty' | 'advanced'>('topology');
   const [collapsed, setCollapsed] = useState<boolean>(false);
 
   const updateField = <K extends keyof SimulationConfig>(key: K, value: SimulationConfig[K]) => {
@@ -96,6 +97,17 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             >
               <Cpu className="w-3 h-3" />
               <span>Routing</span>
+            </button>
+            <button
+              onClick={() => setActiveSection('uncertainty')}
+              className={`flex-1 py-1.5 px-2 rounded flex items-center justify-center gap-1.5 transition-colors ${
+                activeSection === 'uncertainty'
+                  ? 'bg-[#181a24] text-slate-100 font-semibold border border-[#2b3042]'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#0e1016]'
+              }`}
+            >
+              <ShieldAlert className="w-3 h-3 text-amber-400" />
+              <span>Uncertainty</span>
             </button>
             <button
               onClick={() => setActiveSection('advanced')}
@@ -505,6 +517,139 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     onChange={(e) => updateField('max_dp_hops', parseInt(e.target.value) || 5)}
                     className="w-full accent-slate-400 cursor-pointer"
                   />
+                </div>
+              </div>
+            )}
+
+            {/* Uncertainty & Channel Realism Section */}
+            {activeSection === 'uncertainty' && (
+              <div className="space-y-3.5">
+                <div className="p-2.5 rounded bg-[#07080d] border border-[#232738] space-y-2">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-300">
+                    <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Realistic Network Uncertainty</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-tight">
+                    Configures initial battery heterogeneity, channel shadow fading, sensor ADC noise, and telemetry suppression.
+                  </p>
+                </div>
+
+                {/* Initial Battery Distribution */}
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                    Initial Battery Distribution
+                  </label>
+                  <select
+                    value={config.initial_energy_distribution || 'homogeneous'}
+                    onChange={(e) => updateField('initial_energy_distribution', e.target.value as any)}
+                    className="w-full bg-[#050608] border border-[#1e212c] rounded px-2.5 py-1.5 text-slate-200 focus:border-slate-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="homogeneous">Homogeneous (All nodes identical 10%)</option>
+                    <option value="uniform">Uniform Jitter (± Heterogeneity)</option>
+                    <option value="staggered">Staggered Deployment (15% - 85% capacity)</option>
+                    <option value="gaussian">Gaussian Battery Distribution</option>
+                  </select>
+                </div>
+
+                {/* Heterogeneity Ratio */}
+                <div>
+                  <div className="flex justify-between text-[11px] mb-1">
+                    <span className="text-slate-400">Battery Heterogeneity Variance:</span>
+                    <span className="font-mono text-slate-300">
+                      {((config.energy_heterogeneity || 0.0) * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.0}
+                    max={1.0}
+                    step={0.05}
+                    value={config.energy_heterogeneity || 0.0}
+                    onChange={(e) => updateField('energy_heterogeneity', parseFloat(e.target.value))}
+                    className="w-full accent-amber-400 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-500 font-mono">
+                    <span>0% (Identical)</span>
+                    <span>50%</span>
+                    <span>100% (High Jitter)</span>
+                  </div>
+                </div>
+
+                {/* Channel Fading */}
+                <div>
+                  <div className="flex justify-between text-[11px] mb-1">
+                    <span className="text-slate-400">Channel Shadow Fading (σ_shadow):</span>
+                    <span className="font-mono text-slate-300">
+                      {(config.channel_fading_sigma || 0.0).toFixed(1)} dB
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.0}
+                    max={5.0}
+                    step={0.5}
+                    value={config.channel_fading_sigma || 0.0}
+                    onChange={(e) => updateField('channel_fading_sigma', parseFloat(e.target.value))}
+                    className="w-full accent-cyan-400 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-500 font-mono">
+                    <span>0 dB (Deterministic)</span>
+                    <span>2.5 dB</span>
+                    <span>5.0 dB (Severe Fading)</span>
+                  </div>
+                </div>
+
+                {/* MAC Retransmissions */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-1">
+                      MAC Retransmissions
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={4}
+                      value={config.max_retransmissions || 0}
+                      onChange={(e) => updateField('max_retransmissions', parseInt(e.target.value) || 0)}
+                      className="w-full bg-[#050608] border border-[#1e212c] rounded px-2 py-1 font-mono text-[11px] text-slate-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 mb-1">
+                      Sensor ADC Noise (mJ)
+                    </label>
+                    <input
+                      type="number"
+                      min={0.0}
+                      max={20.0}
+                      step={1.0}
+                      value={config.sensor_noise_std ? config.sensor_noise_std * 1000 : 0.0}
+                      onChange={(e) => updateField('sensor_noise_std', (parseFloat(e.target.value) || 0) / 1000.0)}
+                      className="w-full bg-[#050608] border border-[#1e212c] rounded px-2 py-1 font-mono text-[11px] text-slate-200"
+                    />
+                  </div>
+                </div>
+
+                {/* Telemetry Report Interval */}
+                <div>
+                  <div className="flex justify-between text-[11px] mb-1">
+                    <span className="text-slate-400">Telemetry Freshness Epoch (R):</span>
+                    <span className="font-mono text-slate-300">
+                      Every {config.report_interval || 1} round{config.report_interval === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={25}
+                    step={1}
+                    value={config.report_interval || 1}
+                    onChange={(e) => updateField('report_interval', parseInt(e.target.value) || 1)}
+                    className="w-full accent-slate-400 cursor-pointer"
+                  />
+                  <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
+                    Nodes report battery only every R rounds. Between reports, router uses observable belief.
+                  </p>
                 </div>
               </div>
             )}

@@ -35,6 +35,7 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
   const [showRoutes, setShowRoutes] = useState<boolean>(true);
   const [showLabels, setShowLabels] = useState<boolean>(false);
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
+  const [displayMode, setDisplayMode] = useState<'truth' | 'belief' | 'error'>('truth');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -53,6 +54,9 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
   const routesHistory = results?.detailed_data.routes_history;
   const clusterAssignments = results?.detailed_data.cluster_assignments_history;
   const shadowMultipliers = results?.detailed_data.node_shadow_multipliers || {};
+  const beliefMatrix = results?.detailed_data.belief_matrix;
+  const varianceMatrix = results?.detailed_data.variance_matrix;
+  const initialEnergies = results?.detailed_data.node_initial_energies || {};
 
   const currentCHs = chHistory && chHistory[roundIdx] ? chHistory[roundIdx] : [];
   const currentRoutes = routesHistory && routesHistory[roundIdx] ? routesHistory[roundIdx] : {};
@@ -100,27 +104,49 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
     }
   };
 
-  // Build node data for rendering
+  // Build node data for rendering with physical truth vs belief state
   const nodes = [];
   for (let i = 0; i < numNodes; i++) {
     const pos = nodePositions[i] || {
       x: (i * 17) % areaSize,
       y: (i * 23) % areaSize
     };
-    const residual = energyMatrix && energyMatrix[roundIdx] ? energyMatrix[roundIdx][i] : config.init_energy;
+    const initEnergy = initialEnergies[i] !== undefined ? initialEnergies[i] : config.init_energy;
+    const residual = energyMatrix && energyMatrix[roundIdx] ? energyMatrix[roundIdx][i] : initEnergy;
+    const believedEnergy = beliefMatrix && beliefMatrix[roundIdx] ? beliefMatrix[roundIdx][i] : initEnergy;
+    const beliefVar = varianceMatrix && varianceMatrix[roundIdx] ? varianceMatrix[roundIdx][i] : 0.0;
+    const beliefStd = Math.sqrt(Math.max(0, beliefVar));
+    const estimationError = Math.abs(residual - believedEnergy);
+
     const isAlive = residual > 1e-6;
     const isCH = currentCHs.includes(i);
     const clusterId = currentAssignments[i] !== undefined ? currentAssignments[i] : (isCH ? i : null);
     const shadowMul = shadowMultipliers[i] !== undefined ? shadowMultipliers[i] : 1.0;
     const maxEnergy = config.max_capacity || 1.0;
-    const energyRatio = Math.max(0, Math.min(1, residual / maxEnergy));
+    
+    const trueRatio = Math.max(0, Math.min(1, residual / maxEnergy));
+    const beliefRatio = Math.max(0, Math.min(1, believedEnergy / maxEnergy));
+    
+    // Choose active ratio based on user-selected Display Mode
+    let activeRatio = trueRatio;
+    if (displayMode === 'belief') {
+      activeRatio = beliefRatio;
+    } else if (displayMode === 'error') {
+      activeRatio = Math.max(0, Math.min(1, (estimationError * 8.0) / maxEnergy));
+    }
 
     nodes.push({
       id: i,
       x: pos.x,
       y: pos.y,
+      initEnergy,
       residual,
-      energyRatio,
+      believedEnergy,
+      beliefStd,
+      estimationError,
+      energyRatio: activeRatio,
+      trueEnergyRatio: trueRatio,
+      beliefEnergyRatio: beliefRatio,
       isAlive,
       isCH,
       clusterId,
@@ -150,6 +176,39 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
 
         {/* View toggles, Export & zoom controls */}
         <div className="flex items-center gap-2 text-xs">
+          {/* Display Mode: Truth vs Router Belief vs Telemetry Error */}
+          <div className="flex items-center bg-[#07080a] p-0.5 rounded border border-[#1c1e28]">
+            <button
+              onClick={() => setDisplayMode('truth')}
+              className={`px-2 py-1 rounded text-[11px] flex items-center gap-1.5 transition-colors ${
+                displayMode === 'truth' ? 'bg-[#0f1f17] text-emerald-300 font-semibold border border-[#1b3d29]' : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Physical Ground Truth Battery (True continuous physical charge)"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <span>Truth</span>
+            </button>
+            <button
+              onClick={() => setDisplayMode('belief')}
+              className={`px-2 py-1 rounded text-[11px] flex items-center gap-1.5 transition-colors ${
+                displayMode === 'belief' ? 'bg-[#0e1e28] text-cyan-300 font-semibold border border-[#1a384b]' : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Router Believed Energy State (Observable belief from telemetry)"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+              <span>Belief</span>
+            </button>
+            <button
+              onClick={() => setDisplayMode('error')}
+              className={`px-2 py-1 rounded text-[11px] flex items-center gap-1.5 transition-colors ${
+                displayMode === 'error' ? 'bg-[#281a0e] text-amber-300 font-semibold border border-[#4b331a]' : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Telemetry Estimation Error |Truth - Belief|"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+              <span>Error</span>
+            </button>
+          </div>
           <div className="flex items-center bg-[#07080a] p-0.5 rounded border border-[#1c1e28]">
             <button
               onClick={() => setShowClusters(!showClusters)}
@@ -459,12 +518,20 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
               const cy = (node.y / areaSize) * 600;
               const isHovered = hoveredNodeId === node.id;
 
-              // Color based on role and energy
+              // Color based on role, displayMode and energy
               let nodeColor = '#3e4f66'; // active member
               if (!node.isAlive) {
                 nodeColor = '#242833'; // dead
               } else if (node.isCH) {
                 nodeColor = '#925807'; // Cluster Head ochre
+              } else if (displayMode === 'belief') {
+                if (node.energyRatio < 0.2) nodeColor = '#0f2936';
+                else if (node.energyRatio < 0.5) nodeColor = '#154157';
+                else nodeColor = '#1f6587';
+              } else if (displayMode === 'error') {
+                if (node.estimationError > 0.02) nodeColor = '#8a2b2b';
+                else if (node.estimationError > 0.005) nodeColor = '#8a652b';
+                else nodeColor = '#2b6942';
               } else if (node.energyRatio < 0.2) {
                 nodeColor = '#7a2e2e'; // critical brick red
               } else if (node.energyRatio < 0.5) {
@@ -489,6 +556,18 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
                       stroke="#94a3b8"
                       strokeWidth="1.2"
                       strokeDasharray="2 2"
+                    />
+                  )}
+
+                  {/* Uncertainty Standard Deviation Halo (when in Belief mode) */}
+                  {displayMode === 'belief' && node.isAlive && node.beliefStd > 0.001 && (
+                    <circle
+                      r={Math.min(14, 7 + (node.beliefStd * 200))}
+                      fill="none"
+                      stroke="#38bdf8"
+                      strokeWidth="0.8"
+                      strokeDasharray="2 2"
+                      opacity={0.6}
                     />
                   )}
 
@@ -584,7 +663,7 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
 
         {/* Hover Node Tooltip Card */}
         {activeHoverNode && (
-          <div className="absolute top-3 right-3 bg-[#07080b] p-3 rounded border border-[#222634] text-xs w-60 z-20 space-y-1.5">
+          <div className="absolute top-3 right-3 bg-[#07080b] p-3 rounded border border-[#222634] text-xs w-64 z-20 space-y-1.5 shadow-xl">
             <div className="flex items-center justify-between pb-1 border-b border-[#1b1d26]">
               <span className="font-semibold font-mono text-slate-200">
                 Node #{activeHoverNode.id} {activeHoverNode.isCH && <span className="text-amber-500">(CH)</span>}
@@ -602,15 +681,41 @@ export const NetworkTopologyView: React.FC<NetworkTopologyViewProps> = ({
                 <span className="font-mono">({activeHoverNode.x.toFixed(1)}m, {activeHoverNode.y.toFixed(1)}m)</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Residual Energy:</span>
-                <span className="font-mono text-slate-200">
-                  {(activeHoverNode.residual * 1000).toFixed(2)} mJ / {(config.max_capacity * 1000).toFixed(0)} mJ
+                <span className="text-slate-400">Initial Battery:</span>
+                <span className="font-mono text-slate-300">
+                  {(activeHoverNode.initEnergy * 1000).toFixed(2)} mJ
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-[#161822] pt-1">
+                <span className="text-emerald-400 font-medium">Physical Truth:</span>
+                <span className="font-mono text-emerald-300 font-semibold">
+                  {(activeHoverNode.residual * 1000).toFixed(2)} mJ ({(activeHoverNode.trueEnergyRatio * 100).toFixed(1)}%)
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Battery Level:</span>
-                <span className="font-mono text-slate-200 font-semibold">
-                  {(activeHoverNode.energyRatio * 100).toFixed(1)}%
+                <span className="text-cyan-400 font-medium">Router Believed:</span>
+                <span className="font-mono text-cyan-300 font-semibold">
+                  {(activeHoverNode.believedEnergy * 1000).toFixed(2)} mJ ({(activeHoverNode.beliefEnergyRatio * 100).toFixed(1)}%)
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-amber-400">Estimation Error:</span>
+                <span className="font-mono text-amber-300 font-semibold">
+                  {(activeHoverNode.estimationError * 1000).toFixed(2)} mJ
+                </span>
+              </div>
+              {activeHoverNode.beliefStd > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Belief Uncertainty:</span>
+                  <span className="font-mono text-slate-400">
+                    &plusmn;{(activeHoverNode.beliefStd * 1000).toFixed(2)} mJ
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-[#161822] pt-1">
+                <span className="text-slate-400">Telemetry Status:</span>
+                <span className="font-mono text-slate-300">
+                  {config.energy_view === 'oracle' ? 'Live Oracle' : `Every ${config.report_interval || 1} Rnds`}
                 </span>
               </div>
               <div className="flex justify-between">

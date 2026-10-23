@@ -13,6 +13,7 @@ backend/wsn_simulator.db
 node_modules/
 frontend/node_modules/
 frontend/build/
+frontend/dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -38,3 +39,5 @@ Thumbs.db
 # Generated simulation results & plots
 results/
 backend/results/
+rep2_eq_*.svg
+rep2_eq_pngs/

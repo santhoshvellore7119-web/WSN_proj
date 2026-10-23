@@ -167,6 +167,41 @@ export const PRESET_SCENARIOS: PresetScenario[] = [
       routing_algorithm: 'dijkstra',
       seed: 55
     }
+  },
+  {
+    id: 'high_uncertainty_deployment',
+    name: 'Real-World High Uncertainty & Telemetry Noise',
+    description: 'Realistic deployment: staggered initial battery levels (15-85% capacity), log-normal channel fading (2.5 dB), ADC sensor noise, and stale telemetry reporting (R=10). Highlights Belief DP resilience under partial observability.',
+    config: {
+      nodes: 50,
+      rounds: 200,
+      area: 100,
+      init_energy: 0.08,
+      max_capacity: 0.50,
+      cluster_ratio: 0.08,
+      bs_x: 50,
+      bs_y: 50,
+      transmission_range: 35.0,
+      harvesting_profile: 'solar',
+      solar_peak: 0.003,
+      solar_period: 24,
+      solar_day_fraction: 0.5,
+      stoch_lambda: 2.0,
+      stoch_quantum: 0.005,
+      disable_time_dp: false,
+      disable_harvesting_ch: false,
+      disable_live_reroute: false,
+      max_dp_hops: 5,
+      routing_algorithm: 'belief_dp',
+      energy_view: 'histogram',
+      report_interval: 10,
+      energy_heterogeneity: 0.6,
+      initial_energy_distribution: 'staggered',
+      channel_fading_sigma: 2.5,
+      max_retransmissions: 2,
+      sensor_noise_std: 0.005,
+      seed: 42
+    }
   }
 ];
 
