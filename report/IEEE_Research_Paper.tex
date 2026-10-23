@@ -50,7 +50,7 @@ In this paper, we propose a comprehensive, lightweight algorithmic framework for
 (3) \textbf{Probabilistic Belief Routing Under Partial Observability:} An architectural decoupling of physical ground truth from router observability via a 24-bin discrete Histogram Belief Filter with exact boundary clipping at 0 and $C_i$, coupled with log-domain Max-Product Belief DP with recharge waiting deadlines ($w \in [0, D]$) and sequential load reservations.
 (4) \textbf{Harvesting-Aware Dynamic Clustering (EH-LEACH):} Solar-weighted cluster head elections with min-heap priority queue tiebreaking.
 
-We validate the framework through an automated 68-test unit verification suite (100\% pass rate) and multi-seed statistical benchmarks ($N=30$ seeds, 350 rounds). Empirical results confirm that under scarce energy regimes, our belief-driven routing closes up to $81.5\%$ of the omniscient oracle delivery gap while reducing Expected Calibration Error (ECE = 0.019 vs 0.039) and Brier scores over stale telemetry. Furthermore, we characterize the first-order radio electronic reception dissipation penalty ($E_{\text{rx}} = k \cdot E_{\text{elec}}$), delineating exact switching boundaries where direct single-hop transmission outperforms multi-hop relaying.
+We validate the framework through an automated 75-test unit verification suite (100\% pass rate) and multi-seed statistical benchmarks ($N=30$ seeds, 350 rounds). Empirical results confirm that under scarce energy regimes, our belief-driven routing closes up to $81.5\%$ of the omniscient oracle delivery gap while reducing Expected Calibration Error (ECE = 0.019 vs 0.039) and Brier scores over stale telemetry. Furthermore, we characterize the first-order radio electronic reception dissipation penalty ($E_{\text{rx}} = k \cdot E_{\text{elec}}$), delineating exact switching boundaries where direct single-hop transmission outperforms multi-hop relaying.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -299,9 +299,10 @@ The framework is implemented as an end-to-end, modular software package:
 \texttt{test\_clustering.py} & LEACH / EH-LEACH probability & 4 & \textbf{PASS} \\
 \texttt{test\_harvesting\_model.py} & Diurnal solar \& canopy shade & 6 & \textbf{PASS} \\
 \texttt{test\_backend\_api.py} & FastAPI endpoints \& SQLite & 10 & \textbf{PASS} \\
+\texttt{test\_battery\_heterogeneity\_and\_fading.py} & Battery jitter, fading \& ADC noise & 7 & \textbf{PASS} \\
 \texttt{test\_network.py}, Baselines & Graph models \& trace replay & 21 & \textbf{PASS} \\
 \midrule
-\textbf{Total Testbench} & \textbf{Entire Algorithmic Core} & \textbf{68} & \textbf{100\%} \\
+\textbf{Total Testbench} & \textbf{Entire Algorithmic Core} & \textbf{75} & \textbf{100\%} \\
 \bottomrule
 \end{tabular}
 \end{table}

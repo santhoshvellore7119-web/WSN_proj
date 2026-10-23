@@ -18,7 +18,7 @@ In this paper, we propose a comprehensive, lightweight algorithmic framework for
 3. **Probabilistic Belief Routing Under Energy Uncertainty:** An architectural decoupling of physical ground truth from router observability via a **24-bin discrete Histogram Belief Filter** with exact boundary clipping at 0 and $C_i$, coupled with log-domain Max-Product Belief DP with recharge waiting deadlines ($w \in [0, D]$) and sequential load reservations.
 4. **Harvesting-Aware Clustering (EH-LEACH):** Dynamic cluster head election scaled by solar intake ratios with min-heap priority queue tiebreaking.
 
-We validate the framework through an automated 68-test unit verification suite (100% pass rate) and multi-seed statistical benchmarks ($N=30$ seeds, 350 rounds). Empirical results confirm that under scarce energy regimes, our belief-driven routing closes **up to 81.5% of the omniscient oracle delivery gap** while reducing Expected Calibration Error (ECE = 0.019 vs 0.039) and Brier scores over stale telemetry. Furthermore, we characterize the first-order radio electronic reception dissipation penalty ($E_{\text{rx}} = k \cdot E_{\text{elec}}$), delineating exact switching boundaries where direct transmission outperforms multi-hop relaying.
+We validate the framework through an automated 75-test unit verification suite (100% pass rate) and multi-seed statistical benchmarks ($N=30$ seeds, 350 rounds). Empirical results confirm that under scarce energy regimes, our belief-driven routing closes **up to 81.5% of the omniscient oracle delivery gap** while reducing Expected Calibration Error (ECE = 0.019 vs 0.039) and Brier scores over stale telemetry. Furthermore, we characterize the first-order radio electronic reception dissipation penalty ($E_{\text{rx}} = k \cdot E_{\text{elec}}$), delineating exact switching boundaries where direct transmission outperforms multi-hop relaying.
 
 **Index Terms—** Energy Harvesting, Wireless Sensor Networks, Dynamic Programming, Disjoint-Set Union, Fault-Tolerant Routing, Partially Observable Markov Decision Processes, Telemetry Calibration, Radio Dissipation Physics.
 
@@ -419,7 +419,7 @@ The framework is developed as an open-source, full-stack software system:
 ```
 
 ### A. Automated Verification Test Suite
-Software reliability and mathematical correctness are verified by an automated Pytest testbench containing **68 passing tests** (`python -m pytest -v`, total execution time: 4.70 seconds), summarized in Table IV.
+Software reliability and mathematical correctness are verified by an automated Pytest testbench containing **75 passing tests** (`python -m pytest -v`, total execution time: 2.13 seconds), summarized in Table IV.
 
 ### TABLE IV: Automated Pytest Verification Suite Breakdown
 | Test Suite Module | Invariants & Algorithms Verified | Tests | Status |
@@ -430,12 +430,13 @@ Software reliability and mathematical correctness are verified by an automated P
 | [`test_rip_up_reroute.py`](file:///c:/Users/Santhosh/Documents/antigravity/joyful-chandrasekhar/tests/test_rip_up_reroute.py) | Union-Find path compression, union by rank, local bridge detour splicing. | 4 | **PASSED** |
 | [`test_dsu_speedup.py`](file:///c:/Users/Santhosh/Documents/antigravity/joyful-chandrasekhar/tests/test_dsu_speedup.py) | DSU detour latency reduction and 0% packet loss verification. | 1 | **PASSED** |
 | [`test_uncertainty_routing_and_calibration.py`](file:///c:/Users/Santhosh/Documents/antigravity/joyful-chandrasekhar/tests/test_uncertainty_routing_and_calibration.py) | 24-bin histogram calibration, Sheppard's variance, Brier score, ECE, DP recharge waiting. | 7 | **PASSED** |
+| [`test_battery_heterogeneity_and_fading.py`](file:///c:/Users/Santhosh/Documents/antigravity/joyful-chandrasekhar/tests/test_battery_heterogeneity_and_fading.py) | Initial battery heterogeneity (uniform, staggered, gaussian), log-normal shadow fading ($\sigma=0..5\text{dB}$), Sigmoid PRR, MAC retries, and ADC noise. | 7 | **PASSED** |
 | [`test_energy_view.py`](file:///c:/Users/Santhosh/Documents/antigravity/joyful-chandrasekhar/tests/test_energy_view.py) | `EnergyView` protocol conformance across Oracle, Blind, Stale, Gaussian views. | 5 | **PASSED** |
 | [`test_clustering.py`](file:///c:/Users/Santhosh/Documents/antigravity/joyful-chandrasekhar/tests/test_clustering.py) | LEACH and EH-LEACH election probability weighting and non-empty CH sets. | 4 | **PASSED** |
 | [`test_harvesting_model.py`](file:///c:/Users/Santhosh/Documents/antigravity/joyful-chandrasekhar/tests/test_harvesting_model.py) | Solar diurnal day/night cycles, Poisson arrivals, canopy shadow attenuation. | 6 | **PASSED** |
 | [`test_backend_api.py`](file:///c:/Users/Santhosh/Documents/antigravity/joyful-chandrasekhar/tests/test_backend_api.py) | FastAPI routes (`/health`, `/simulate`, `/benchmark`, `/runs`, CSV exports, bounds rejection). | 10 | **PASSED** |
 | [`test_network.py`](file:///c:/Users/Santhosh/Documents/antigravity/joyful-chandrasekhar/tests/test_network.py), Baselines | Adjacency list construction, Dijkstra, A* search, real-trace solar replay. | 21 | **PASSED** |
-| **Total Test Suite** | **Entire Algorithmic and Full-Stack Core** | **68** | **100% PASS** |
+| **Total Test Suite** | **Entire Algorithmic and Full-Stack Core** | **75** | **100% PASS** |
 
 ---
 
