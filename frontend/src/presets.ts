@@ -16,7 +16,7 @@ export const PRESET_SCENARIOS: PresetScenario[] = [
       nodes: 50,
       rounds: 200,
       area: 100,
-      init_energy: 0.05,
+      init_energy: 0.15,
       max_capacity: 0.50,
       cluster_ratio: 0.08,
       bs_x: 50,
@@ -35,6 +35,11 @@ export const PRESET_SCENARIOS: PresetScenario[] = [
       disable_live_reroute: false,
       max_dp_hops: 5,
       routing_algorithm: 'dijkstra',
+      energy_heterogeneity: 0.6,
+      initial_energy_distribution: 'staggered',
+      channel_fading_sigma: 1.5,
+      max_retransmissions: 1,
+      sensor_noise_std: 0.003,
       seed: 42
     }
   },
