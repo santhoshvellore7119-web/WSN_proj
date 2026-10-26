@@ -1,3 +1,10 @@
+import fs from 'fs';
+
+// Canonicalize cwd from any junction/symlink
+try {
+  process.chdir(fs.realpathSync(process.cwd()));
+} catch (_) {}
+
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -7,8 +14,7 @@ export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
-      preserveSymlinks: true,
-      alias: {
+            alias: {
         '@': path.resolve(__dirname, '.'),
       },
     },

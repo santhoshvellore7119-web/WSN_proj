@@ -1,3 +1,10 @@
+import fs from 'fs';
+
+// Canonicalize cwd from any junction/symlink to avoid Vite/esbuild path divergence
+try {
+  process.chdir(fs.realpathSync(process.cwd()));
+} catch (_) {}
+
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
