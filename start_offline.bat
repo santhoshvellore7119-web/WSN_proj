@@ -1,5 +1,5 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
 title WSN Energy-Harvesting Simulator - Launcher
 echo ============================================================
 echo   Starting WSN Energy Routing System (Offline Mode)
@@ -8,24 +8,24 @@ echo.
 
 cd /d "%~dp0"
 
-:: 1. Ensure Python Virtual Environment
+REM 1. Ensure Python Virtual Environment
 if not exist ".venv\Scripts\python.exe" (
-    echo [*] Creating Python virtual environment (.venv)...
+    echo [*] Creating Python virtual environment...
     python -m venv .venv
     echo [*] Installing requirements...
     call .venv\Scripts\activate.bat
     pip install -r requirements.txt
 )
 
-:: 2. Ensure Frontend Dependencies
+REM 2. Ensure Frontend Dependencies
 if not exist "frontend\node_modules" (
-    echo [*] Installing frontend dependencies (npm install)...
+    echo [*] Installing frontend dependencies...
     cd frontend
     call npm install
-    cd ..
+    cd /d "%~dp0"
 )
 
-:: 3. Free busy ports 8000 and 3000 if left open by previous sessions
+REM 3. Free busy ports 8000 and 3000 if left open by previous sessions
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":8000" ^| findstr "LISTENING"') do (
     taskkill /F /PID %%a >nul 2>&1
 )
@@ -34,12 +34,12 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3000" ^| findstr "LISTENING
 )
 
 echo [1/2] Starting FastAPI Backend on http://127.0.0.1:8000 ...
-start "WSN-Backend" cmd /k ".venv\Scripts\activate.bat && python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000"
+start "WSN-Backend" cmd /k "cd /d \"%~dp0\" && call .venv\Scripts\activate.bat && python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000"
 
-timeout /t 3 /nobreak >nul
+ping 127.0.0.1 -n 4 >nul
 
 echo [2/2] Starting React Frontend on http://localhost:3000 ...
-start "WSN-Frontend" cmd /k "cd frontend && npm run dev"
+start "WSN-Frontend" cmd /k "cd /d \"%~dp0frontend\" && npm run dev"
 
 echo.
 echo ============================================================
