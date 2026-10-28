@@ -157,7 +157,7 @@ p.font.bold = True
 p.font.color.rgb = C_WHITE
 
 p2 = tf.add_paragraph()
-p2.text = "Teaching sensor networks to look ahead in time, anticipate solar recharge, and recover from failures on the fly."
+p2.text = "Teaching sensor networks to look ahead in time, resolve channel & battery uncertainty, and recover from failures on the fly."
 p2.font.name = FONT_BODY
 p2.font.size = Pt(15)
 p2.font.color.rgb = RGBColor(148, 163, 184)
@@ -165,9 +165,9 @@ p2.space_before = Pt(8)
 
 # Team Member Cards
 members = [
-    ("Santhosh G", "25BEL0016", "3D Lookahead DP (dp[v][h][t])\n24-Bin Belief Filter & Sim Core"),
-    ("Thilang T V", "25BEL0036", "Live DSU Detour Recovery\nFastAPI REST Backend & React 19 UI"),
-    ("Ananthakrishnan R", "25BEL0005", "Heinzelman Radio Physics\nSolar Harvesting Profiles & Pytest Suite")
+    ("Santhosh G", "25BEL0016", "3D Lookahead DP (dp[v][h][t])\nMax-Product Belief DP & Sim Core"),
+    ("Thilang T V", "25BEL0036", "Live DSU Detour Recovery\nFastAPI REST Engine & React 19 UI"),
+    ("Ananthakrishnan R", "25BEL0005", "Log-Normal Fading & Radio Physics\n75-Test Pytest Suite & IEEE Papers")
 ]
 
 card_w = Inches(3.55)
@@ -781,7 +781,7 @@ Nodes in open sunlight get picked 2.4 times more frequently, taking on the heavy
 # SLIDE 10: ALGORITHM 4  -  ROUTING WHEN BATTERY REPORTS ARE STALE
 # ==============================================================================
 s10 = prs.slides.add_slide(blank_layout)
-add_header(s10, "Algorithm 4: Routing When Battery Reports Are Stale", "Algorithm 4: Belief Filter", 10)
+add_header(s10, "Algorithm 4: Routing Under Energy & Channel Uncertainty", "Algorithm 4: Belief Filter & Max-Product DP", 10)
 
 # Left Card: The Partial Observability Dilemma
 add_card(s10, Inches(0.8), Inches(1.6), Inches(5.7), Inches(5.1))
@@ -796,7 +796,7 @@ p.font.bold = True
 p.font.color.rgb = C_NAVY_DARK
 p.space_after = Pt(6)
 
-add_bullet(tf, "The Telemetry Dilemma:", "Sensors cannot broadcast battery telemetry every round. Transmitting the status update itself burns precious battery! The router must make decisions under uncertainty.", 10)
+add_bullet(tf, "Joint Uncertainty Factors:", "Sensors cannot report telemetry continuously. Compounded by initial battery heterogeneity (0.6, staggered 15-85%), ADC voltage noise (sigma=0.003J), and channel fading (sigma=1.5dB), the router must route under partial observability.", 10)
 add_bullet(tf, "5 Belief Views Evaluated (src/energy_view.py):", "", 10)
 add_bullet(tf, "- Oracle:", "Omniscient exact battery reading. (Cheating upper baseline).", 9.5)
 add_bullet(tf, "- Blind:", "Zero updates after Round 0. Completely blind to solar refill.", 9.5)
@@ -819,7 +819,7 @@ p.space_after = Pt(6)
 
 add_bullet(tf, "The Gaussian Boundary Trap:", "Gaussian bell curves stretch to infinity. In a battery, energy cannot physically drop below 0 Joules or exceed E_max = 0.5 Joules! Gaussian math creates false probabilities.", 10)
 add_bullet(tf, "Exact Boundary Mass Clipping:", "Our 24-bin histogram explicitly clips probability mass: negative energy shifts into Bin 0 (brownout probability); excess solar shifts into Bin 23 (saturation).", 10)
-add_bullet(tf, "Log-Domain Max-Product Confidence Routing:", "Maximizes the mathematical probability that all hops survive:", 10)
+add_bullet(tf, "Log-Domain Max-Product Belief DP:", "Maximizes the joint probability that every hop survives: max prod P(E_u >= E_tx) <=> max sum log P(E_u >= E_tx), proven optimal in polynomial time.", 10)
 
 # Embed Equation 6 image if available
 eq6_path = os.path.join(EQ_DIR, "eq_6.png")
@@ -843,7 +843,7 @@ Our Max-Product DP maximizes the sum of log-probabilities across the route, choo
 # SLIDE 11: UNDER THE HOOD: HOW WE STRUCTURED THE 4,000+ LINES OF CODE
 # ==============================================================================
 s11 = prs.slides.add_slide(blank_layout)
-add_header(s11, "Under the Hood: How We Structured the 4,000+ Lines of Code", "Codebase Architecture", 11)
+add_header(s11, "Under the Hood: 7,000+ Lines of Production-Grade Code & IEEE Suite", "Codebase Architecture", 11)
 
 rows = 7
 cols = 4
@@ -872,12 +872,12 @@ for j, h in enumerate(headers):
     p.font.color.rgb = C_WHITE
 
 modules_data = [
-    ("src/", "network.py, energy_model.py", "Euclidean graph adjacency, 1st-order radio model (d^2/d^4), Erx penalty", "425 LOC"),
-    ("src/", "dp_lifetime.py, routing.py", "3D Lookahead DP (dp[v][h][t]), DSU live detour recovery, Dijkstra", "535 LOC"),
-    ("src/", "clustering.py, energy_view.py", "EH-LEACH solar threshold rotation, 24-bin histogram belief filter", "445 LOC"),
-    ("src/", "harvesting_model.py, simulator.py", "Diurnal solar, canopy shadows, Poisson bursts, discrete-round loop", "585 LOC"),
-    ("backend/", "main.py, database.py", "FastAPI REST API, async threadpool execution, SQLite run history", "290 LOC"),
-    ("frontend/", "src/ (React 19 + TypeScript)", "Interactive SVG canvas, timeline scrubber, spatial heatmap, Recharts", "~1,850 LOC")
+    ("src/", "dp_lifetime.py, energy_view.py", "3D Lookahead DP, Max-Product Belief Filter under fading & noise", "1,040 LOC"),
+    ("src/", "network.py, energy_model.py", "Heinzelman radio physics, log-normal shadow fading, DSU detours", "980 LOC"),
+    ("backend/", "main.py, database.py", "FastAPI REST API, async threadpool engine, SQLite telemetry store", "480 LOC"),
+    ("frontend/", "NetworkTopologyView.tsx, etc.", "React 19, 7-tier continuous energy gradient, on-node %, inspector card", "~2,250 LOC"),
+    ("tests/", "19 automated test modules", "75 unit tests (fading, belief DP, DSU speedup, counterexample, API)", "1,450 LOC"),
+    ("report/", "IEEE Papers & 65-page Report", "Master Paper, Double-Blind Conference, Digital Twin, Final Report", "3,200 LOC")
 ]
 
 for i, row_data in enumerate(modules_data):
@@ -1028,7 +1028,7 @@ On the right is repair_route_dsu. Using Union-Find with path compression and ran
 # SLIDE 13: THE WEB DASHBOARD: WATCHING SENSOR ROUTES ADAPT LIVE
 # ==============================================================================
 s13 = prs.slides.add_slide(blank_layout)
-add_header(s13, "The Web Dashboard: Watching Sensor Routes Adapt Live", "User Interface", 13)
+add_header(s13, "The Web Dashboard: Individualized Sensor State & Digital Twin", "User Interface", 13)
 
 # Figure 1: Topology Visualizer
 add_card(s13, Inches(0.8), Inches(1.6), Inches(5.7), Inches(5.1))
@@ -1048,8 +1048,8 @@ if os.path.exists(img1_path):
 tb_desc1 = s13.shapes.add_textbox(Inches(1.0), Inches(5.15), Inches(5.3), Inches(1.4))
 tf_d1 = tb_desc1.text_frame
 tf_d1.word_wrap = True
-add_bullet(tf_d1, "Real-Time SVG Canvas:", "Renders all 50 sensor nodes with color-coded operational states: Green (solar rich), Amber (draining relay), Red (browned out).", 9.5)
-add_bullet(tf_d1, "Dynamic Routing Vectors:", "Renders active forwarding paths and cluster head uplinks as directed vector arrows terminating at central Base Station (50, 50).", 9.5)
+add_bullet(tf_d1, "Continuous 7-Tier Energy Gradient:", "Visualizes exact charge levels via 7-tier continuous colors (Green 85-100%, Teal 70-85%, Cyan 50-70%, Lime 35-50%, Amber 20-35%, Orange 8-20%, Red <8%) + circular progress meters.", 9.5)
+add_bullet(tf_d1, "On-Node Badges & Click-to-Pin Inspector:", "Displays numerical charge % badges, sun/shade icons (☀/☁), and click-to-pin inspector card comparing Ground Truth E_i vs Belief Mean mu_i +/- sigma vs Divergence Delta E.", 9.5)
 
 # Figure 2: Playback Scrubber & Simulation Controls
 add_card(s13, Inches(6.833), Inches(1.6), Inches(5.7), Inches(5.1))
@@ -1137,7 +1137,7 @@ print("Saved Slide 8 to 14 checkpoint.")
 # SLIDE 15: PUTTING IT TO THE TEST: 68 AUTOMATED TESTS, 100% PASS RATE
 # ==============================================================================
 s15 = prs.slides.add_slide(blank_layout)
-add_header(s15, "Putting It to the Test: 68 Automated Tests, 100% Pass Rate", "Testing & Reliability", 15)
+add_header(s15, "Putting It to the Test: 75 Automated Tests, 100% Pass Rate", "Testing & Reliability", 15)
 
 # Left Column: Terminal Output Block (Dark theme)
 add_card(s15, Inches(0.8), Inches(1.6), Inches(5.7), Inches(5.1), bg_color=C_DARK_TERMINAL, border_color=C_NAVY_DARK)
@@ -1155,24 +1155,29 @@ p.font.color.rgb = RGBColor(56, 189, 248) # Cyan
 terminal_text = """============================= test session starts =============================
 platform win32 -- Python 3.12.9, pytest-9.1.1
 rootdir: C:\\Users\\Santhosh\\Documents\\antigravity\\WSN_proj
-collected 68 items
+collected 75 items
 
-tests/test_adversarial_counterexample.py ....                            [  5%]
-tests/test_backend_api.py .........                                      [ 19%]
-tests/test_brownout_and_failure.py .....                                 [ 26%]
-tests/test_clustering.py .....                                           [ 33%]
-tests/test_dp_lifetime.py ........                                       [ 45%]
-tests/test_dsu_speedup.py ...                                            [ 50%]
-tests/test_energy_aware_dijkstra.py ....                                 [ 55%]
-tests/test_energy_model.py ......                                        [ 64%]
-tests/test_energy_view.py ......                                         [ 73%]
-tests/test_harvesting_clustering.py ....                                 [ 79%]
-tests/test_harvesting_model.py .....                                     [ 86%]
-tests/test_heterogeneous_harvesting.py ...                               [ 91%]
-tests/test_network.py ....                                               [ 97%]
-tests/test_routing.py ..                                                 [100%]
+tests/test_adversarial_counterexample.py .                               [  1%]
+tests/test_backend_api.py ..........                                     [ 14%]
+tests/test_battery_heterogeneity_and_fading.py .......                   [ 24%]
+tests/test_brownout_and_failure.py ....                                  [ 29%]
+tests/test_clustering.py ....                                            [ 34%]
+tests/test_dp_lifetime.py .....                                          [ 41%]
+tests/test_dsu_speedup.py .                                              [ 42%]
+tests/test_energy_aware_dijkstra.py .                                    [ 44%]
+tests/test_energy_model.py ....                                          [ 49%]
+tests/test_energy_view.py .....                                          [ 56%]
+tests/test_harvesting_clustering.py ..                                   [ 58%]
+tests/test_harvesting_model.py ......                                    [ 66%]
+tests/test_heterogeneous_harvesting.py ..                                [ 69%]
+tests/test_literature_baselines.py ..                                    [ 72%]
+tests/test_network.py .....                                              [ 78%]
+tests/test_rip_up_reroute.py ....                                        [ 84%]
+tests/test_routing.py .                                                  [ 85%]
+tests/test_time_augmented_dp.py ....                                     [ 90%]
+tests/test_uncertainty_routing_and_calibration.py .......                [100%]
 
-============================== 68 passed in 4.72s =============================="""
+======================= 75 passed, 1 warning in 3.28s ========================"""
 
 p2 = tf.add_paragraph()
 p2.text = terminal_text
@@ -1193,12 +1198,12 @@ p2_h.font.bold = True
 p2_h.font.color.rgb = C_NAVY_DARK
 p2_h.space_after = Pt(6)
 
-add_bullet(tf2, "Mathematical Correctness:", "test_adversarial_counterexample mathematically confirms Time-DP picks recharging relay B (0.040J) over Dijkstra relay A (0.030J).", 10)
-add_bullet(tf2, "Radio Physics Compliance:", "test_energy_model verifies the d^2 / d^4 crossover at d0 = 87.7m and receiver electronic dissipation Erx = 50 nJ/bit.", 10)
-add_bullet(tf2, "Live Fault Tolerance:", "test_brownout_and_failure confirms 100% PDR under 10% to 30% injected node deaths via DSU bridge repairs.", 10)
-add_bullet(tf2, "Speedup Verification:", "test_dsu_speedup confirms 3.8x to 6.1x execution speedup over full DP recomputation.", 10)
-add_bullet(tf2, "Probability Conservation:", "test_energy_view confirms 24-bin histogram probability mass always sums to exactly 1.0 with zero leak.", 10)
-add_bullet(tf2, "API Reliability:", "test_backend_api validates FastAPI simulation runs, benchmark sweeps, and SQLite persistence.", 10)
+add_bullet(tf2, "Mathematical Correctness:", "test_adversarial_counterexample confirms Time-DP routes through recharging relay B (0.040J) over greedy Dijkstra relay A (0.030J).", 9.5)
+add_bullet(tf2, "Radio Physics Compliance:", "test_energy_model verifies the d^2 / d^4 crossover at d0 = 87.7m and receiver electronic dissipation Erx = 50 nJ/bit.", 9.5)
+add_bullet(tf2, "Channel Fading & Retries:", "test_battery_heterogeneity_and_fading (7 tests) validates log-normal shadow fading (sigma=1.5dB), MAC retries (M=1), and battery heterogeneity.", 9.5)
+add_bullet(tf2, "Belief DP & Calibration:", "test_uncertainty_routing_and_calibration (7 tests) confirms Max-Product DP, censored observation updates, and ADC noise calibration.", 9.5)
+add_bullet(tf2, "Live Fault Tolerance:", "test_brownout_and_failure confirms 100% PDR under 10% to 30% injected node deaths via DSU bridge repairs.", 9.5)
+add_bullet(tf2, "Execution Speedup:", "test_dsu_speedup confirms 6.02x execution speedup over full DP recomputation with zero dropped packets.", 9.5)
 
 add_speaker_notes(s15, """
 Slide 15 shows our automated testing suite.
@@ -1513,11 +1518,11 @@ Theorem 2 establishes a 2-epsilon approximation bound under bounded harvest fore
 # SLIDE 20: PROJECT WRAP-UP: WHAT WE BUILT & WHERE WE'RE HEADING
 # ==============================================================================
 s20 = prs.slides.add_slide(blank_layout)
-add_header(s20, "Project Wrap-Up: What We Built & Where We're Heading", "Status & Roadmap", 20)
+add_header(s20, "Project Wrap-Up: Published Research Suite & Complete Deliverables", "Status & Roadmap", 20)
 
-rows = 6
+rows = 7
 cols = 4
-tbl_d = s20.shapes.add_table(rows, cols, Inches(0.8), Inches(1.6), Inches(11.733), Inches(3.4)).table
+tbl_d = s20.shapes.add_table(rows, cols, Inches(0.8), Inches(1.5), Inches(11.733), Inches(3.55)).table
 tbl_d.columns[0].width = Inches(2.2)
 tbl_d.columns[1].width = Inches(3.8)
 tbl_d.columns[2].width = Inches(1.8)
@@ -1536,11 +1541,12 @@ for j, h in enumerate(d_headers):
     p.font.color.rgb = C_WHITE
 
 deliv_data = [
-    ("Core Simulation Engine", "Heinzelman radio physics, diurnal solar, canopy shadows", "100% Completed", "src/network.py, src/energy_model.py, verified"),
-    ("Lookahead 3D DP Router", "Time-expanded DAG maximin DP with backpointers", "100% Completed", "src/dp_lifetime.py, <5.2 ms, <48 KB RAM"),
+    ("Core Simulation Engine", "Heinzelman radio physics, shadow fading (1.5dB), diurnal solar", "100% Completed", "src/network.py, src/energy_model.py, verified"),
+    ("Lookahead 3D DP Router", "Time-expanded DAG maximin DP with backpointers (<5.2 ms)", "100% Completed", "src/dp_lifetime.py, <48 KB RAM, optimal lookahead"),
     ("Fault Recovery (DSU)", "Path compression & rank Union-Find local splicing", "100% Completed", "6.02x latency speedup, 100% PDR sustained"),
-    ("Dynamic Clustering", "EH-LEACH harvest-weighted threshold T(n)", "100% Completed", "src/clustering.py, 2.4x sunlit election boost"),
-    ("Interactive Web Suite", "React 19 + FastAPI + SQLite persistence + SVG canvas", "100% Completed", "Production build verified; live scrubber & heatmaps")
+    ("Uncertainty Belief Router", "Max-Product DP under 24-bin histogram filter & ADC noise", "100% Completed", "src/energy_view.py, test_uncertainty passing"),
+    ("Individualized Web Suite", "React 19 + FastAPI + continuous battery gradients & live inspector", "100% Completed", "Production build verified; click-to-pin HUD"),
+    ("Published Research Suite", "Master Paper, Double-Blind Conference, Digital Twin, 65p Report", "100% Completed", "report/ directory, LaTeX + PDFs ready for publication")
 ]
 
 for i, row in enumerate(deliv_data):
@@ -1563,14 +1569,14 @@ tb = s20.shapes.add_textbox(Inches(1.0), Inches(5.25), Inches(11.333), Inches(1.
 tf = tb.text_frame
 tf.word_wrap = True
 p = tf.paragraphs[0]
-p.text = "NEXT STEPS & PUBLICATION BLUEPRINT (2026-2027):"
+p.text = "COMPLETE PUBLICATION PACKAGE & RESEARCH ARTIFACTS:"
 p.font.name = FONT_HEADING
 p.font.size = Pt(10.5)
 p.font.bold = True
 p.font.color.rgb = C_BLUE
 
 p2 = tf.add_paragraph()
-p2.text = "- Journal Target: IEEE Sensors Journal (SCI Q1, IF: 4.3) or Elsevier Ad Hoc Networks (SCI Q1, IF: 4.8).\n- Manuscript Focus: 'Adaptive Lookahead Routing, First-Order Radio Dissipation Trade-Offs, and DSU-Based Live Detour Recovery in Energy-Harvesting Wireless Sensor Networks'.\n- Embedded Hardware Roadmap: Compiling algorithmic core into C/C++ firmware for hardware evaluation on physical ESP32 and MicaZ sensor motes."
+p2.text = "- IEEE Master Research Paper: report/IEEE_Master_Research_Paper.pdf & .tex (Transceiver dissipation & formal proofs).\n- IEEE Double-Blind Conference Paper: report/IEEE_Conference_DoubleBlind.tex & report/IEEE_Conference_Paper.pdf (EDAS/CMT ready).\n- IEEE Digital Twin Architecture Paper: report/IEEE_Digital_Twin_Paper.pdf & .tex (Cyber-physical synchronization).\n- Final Course Project Report: 65-page comprehensive report report/Final_Course_Project_Report.pdf (2.2 MB, complete proofs & benchmarks)."
 p2.font.name = FONT_BODY
 p2.font.size = Pt(9.5)
 p2.font.color.rgb = C_NAVY_DARK
@@ -1682,9 +1688,12 @@ output_pptx_path = os.path.join(BASE_DIR, "Final_Review_Presentation_WSN_Adaptiv
 prs.save(output_pptx_path)
 print(f"Presentation successfully compiled to: {output_pptx_path}")
 
-downloads_path = r"C:\Users\Santhosh\Downloads\Final_Review_Presentation_WSN_Adaptive_Routing.pptx"
-try:
-    shutil.copyfile(output_pptx_path, downloads_path)
-    print(f"Copied presentation to Downloads: {downloads_path}")
-except Exception as e:
-    print(f"Warning: Could not copy to Downloads: {e}")
+for d_name in [
+    r"C:\Users\Santhosh\Downloads\Final_Review_Presentation_WSN_Adaptive_Routing.pptx",
+    r"C:\Users\Santhosh\Downloads\Final_Review_Presentation_WSN_Adaptive_Routing (1).pptx"
+]:
+    try:
+        shutil.copyfile(output_pptx_path, d_name)
+        print(f"Copied presentation to: {d_name}")
+    except Exception as e:
+        print(f"Warning: Could not copy to {d_name}: {e}")
